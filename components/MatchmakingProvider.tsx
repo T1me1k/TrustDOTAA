@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { CheckCircle2, Loader2, Play, RotateCcw, ShieldAlert, Swords, X } from 'lucide-react';
 import { dire, radiant, roles } from '@/lib/data';
+import { useRuntimeConfig } from '@/components/useRuntimeConfig';
 
 type MatchPhase = 'empty' | 'searching' | 'found' | 'accepted' | 'draft' | 'connecting' | 'ready' | 'completed' | 'error';
 
@@ -16,10 +17,8 @@ type MatchmakingContextValue = {
   region: string;
   resetDemo: () => void;
   searchSeconds: number;
-  secondaryRole: string;
   setPrimaryRole: (role: string) => void;
   setRegion: (region: string) => void;
-  setSecondaryRole: (role: string) => void;
   startSearch: () => void;
   acceptMatch: () => void;
 };
@@ -29,16 +28,15 @@ const MatchmakingContext = createContext<MatchmakingContextValue | null>(null);
 export function MatchmakingProvider({ children }: { children: React.ReactNode }) {
   const [region, setRegionState] = useState('EU West');
   const [primaryRole, setPrimaryRoleState] = useState('Mid');
-  const [secondaryRole, setSecondaryRoleState] = useState('Soft Support');
   const [phase, setPhase] = useState<MatchPhase>('empty');
   const [searchSeconds, setSearchSeconds] = useState(0);
   const [acceptCountdown, setAcceptCountdown] = useState(10);
   const [acceptedPlayers, setAcceptedPlayers] = useState(0);
+  const runtimeConfig = useRuntimeConfig();
 
   useEffect(() => {
     setRegionState(localStorage.getItem('trust-region') || 'EU West');
     setPrimaryRoleState(localStorage.getItem('trust-primary-role') || localStorage.getItem('trust-role') || 'Mid');
-    setSecondaryRoleState(localStorage.getItem('trust-secondary-role') || 'Soft Support');
   }, []);
 
   function setRegion(value: string) {
@@ -52,13 +50,8 @@ export function MatchmakingProvider({ children }: { children: React.ReactNode })
     localStorage.setItem('trust-role', value);
   }
 
-  function setSecondaryRole(value: string) {
-    setSecondaryRoleState(value);
-    localStorage.setItem('trust-secondary-role', value);
-  }
-
   function startSearch() {
-    if (!region || !primaryRole || !secondaryRole || primaryRole === secondaryRole) {
+    if (!region || !primaryRole || !runtimeConfig?.matchmaking.enabled || !runtimeConfig?.featureFlags.matchmaking_enabled?.enabled || !runtimeConfig?.featureFlags.play_button_enabled?.enabled) {
       setPhase('error');
       return;
     }
@@ -94,12 +87,12 @@ export function MatchmakingProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (phase !== 'searching') return undefined;
     const timer = window.setInterval(() => setSearchSeconds((value) => value + 1), 1000);
-    const found = window.setTimeout(() => setPhase('found'), 4500);
+    const found = window.setTimeout(() => setPhase('found'), runtimeConfig?.matchmaking.matchFoundDelayMs || 4500);
     return () => {
       window.clearInterval(timer);
       window.clearTimeout(found);
     };
-  }, [phase]);
+  }, [phase, runtimeConfig?.matchmaking.matchFoundDelayMs]);
 
   useEffect(() => {
     if (phase !== 'found') return undefined;
@@ -143,10 +136,8 @@ export function MatchmakingProvider({ children }: { children: React.ReactNode })
     region,
     resetDemo,
     searchSeconds,
-    secondaryRole,
     setPrimaryRole,
     setRegion,
-    setSecondaryRole,
     startSearch,
     acceptMatch,
   };
@@ -170,7 +161,7 @@ export function formatTime(seconds: number) {
 }
 
 function GlobalMatchOverlay() {
-  const { acceptCountdown, acceptMatch, acceptedPlayers, cancelSearch, launchDota, phase, primaryRole, region, resetDemo, searchSeconds, secondaryRole } = useMatchmaking();
+  const { acceptCountdown, acceptMatch, acceptedPlayers, cancelSearch, launchDota, phase, primaryRole, region, resetDemo, searchSeconds } = useMatchmaking();
 
   if (phase === 'empty') return null;
 
@@ -178,7 +169,7 @@ function GlobalMatchOverlay() {
     return (
       <div className="fixed bottom-4 left-1/2 z-[70] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 rounded-3xl border border-white/10 bg-trust-panel/90 p-4 shadow-glow backdrop-blur-2xl md:bottom-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3"><Loader2 className="animate-spin text-trust-soft" /><div><p className="font-black">Searching match · {formatTime(searchSeconds)}</p><p className="text-sm text-zinc-400">{region} · {primaryRole} / {secondaryRole}</p></div></div>
+          <div className="flex items-center gap-3"><Loader2 className="animate-spin text-trust-soft" /><div><p className="font-black">Searching match · {formatTime(searchSeconds)}</p><p className="text-sm text-zinc-400">{region} · {primaryRole}</p></div></div>
           <button onClick={cancelSearch} className="rounded-2xl border border-white/10 px-5 py-3 font-bold transition hover:border-rose-300/50 hover:bg-rose-500/10 hover:text-rose-200">Cancel</button>
         </div>
       </div>
@@ -192,7 +183,7 @@ function GlobalMatchOverlay() {
           <Swords className="mx-auto mb-4 text-trust-soft" size={44} />
           <p className="text-sm uppercase tracking-[.35em] text-trust-soft">Match Found</p>
           <h2 className="mt-2 text-4xl font-black">TRUST Room #8842</h2>
-          <p className="mt-3 text-zinc-400">Accept in {acceptCountdown}s · {region} · {primaryRole} / {secondaryRole}</p>
+          <p className="mt-3 text-zinc-400">Accept in {acceptCountdown}s · {region} · {primaryRole}</p>
           <button onClick={acceptMatch} className="mt-7 w-full rounded-3xl bg-gradient-to-r from-trust-violet to-trust-glow py-5 text-2xl font-black transition hover:scale-[1.02]">Accept</button>
           <button onClick={cancelSearch} className="mt-3 text-sm text-zinc-500 transition hover:text-white">Decline</button>
         </div>
@@ -239,7 +230,7 @@ function GlobalMatchOverlay() {
 
   return (
     <div className="fixed bottom-4 left-1/2 z-[70] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 rounded-3xl border border-rose-300/30 bg-rose-950/90 p-4 shadow-glow backdrop-blur-2xl">
-      <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><ShieldAlert className="text-rose-200" /><div><p className="font-black">Matchmaking error</p><p className="text-sm text-rose-100/70">Choose different primary and secondary roles, then try again.</p></div></div><button onClick={resetDemo} className="rounded-2xl bg-white px-4 py-2 font-bold text-trust-black"><X /></button></div>
+      <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><ShieldAlert className="text-rose-200" /><div><p className="font-black">Matchmaking error</p><p className="text-sm text-rose-100/70">Matchmaking is disabled or the selected queue is unavailable.</p></div></div><button onClick={resetDemo} className="rounded-2xl bg-white px-4 py-2 font-bold text-trust-black"><X /></button></div>
     </div>
   );
 }

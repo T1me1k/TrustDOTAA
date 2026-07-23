@@ -1,0 +1,3 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { checkRateLimit, createSession, verifyPassword } from '@/lib/admin-auth';
+export async function POST(req:NextRequest){ const ip=req.headers.get('x-forwarded-for') || 'local'; if(!checkRateLimit(ip)) return NextResponse.json({error:'Too many attempts'},{status:429}); const {email,password}=await req.json(); const expected=process.env.ADMIN_EMAIL || 'admin@trust.local'; if(email===expected && verifyPassword(password)){ createSession(email); return NextResponse.json({ok:true}); } return NextResponse.json({error:'Invalid credentials'},{status:401}); }

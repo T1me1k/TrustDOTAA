@@ -1,6 +1,7 @@
 'use client';
 
 import { Activity, Clock, Loader2, Play, Radar, RotateCcw, Sparkles, Users, XCircle, Zap } from 'lucide-react';
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Card, Pill, Shell } from '@/components/Shell';
 import { dire, matches, radiant, regions, roles, stats } from '@/lib/data';
@@ -79,7 +80,7 @@ export default function HomeClient() {
             <p className="max-w-2xl text-lg text-zinc-300">Выберите роль и регион, запустите поиск, примите матч и посмотрите полный демо-флоу TRUST до экрана завершённой игры.</p>
             <div className="flex flex-col gap-3 sm:flex-row">
               <a href="#queue" className="group inline-flex items-center justify-center gap-3 rounded-2xl bg-trust-violet px-8 py-4 text-lg font-black shadow-glow transition hover:scale-[1.02] hover:bg-trust-glow"><Play className="fill-white" /> Play</a>
-              <a href="/leaderboard" className="rounded-2xl border border-white/10 bg-white/5 px-8 py-4 text-center font-bold text-zinc-200 transition hover:-translate-y-1 hover:bg-white/10">Leaderboard</a>
+              <Link href="/leaderboard" className="rounded-2xl border border-white/10 bg-white/5 px-8 py-4 text-center font-bold text-zinc-200 transition hover:-translate-y-1 hover:bg-white/10">Leaderboard</Link>
             </div>
           </div>
           <Card className="animate-float"><div className="mb-5 flex items-center justify-between"><div><p className="text-sm text-zinc-400">Live queue</p><h2 className="text-3xl font-black">Prime 5v5</h2></div><Activity className="text-trust-soft" /></div><div className="grid grid-cols-2 gap-3">{stats.map((s) => <div className="rounded-2xl bg-trust-panel/70 p-4 transition hover:bg-white/10" key={s.label}><p className="text-xs text-zinc-500">{s.label}</p><p className="mt-1 text-2xl font-black">{s.value}</p><p className="text-xs text-trust-soft">{s.delta}</p></div>)}</div></Card>

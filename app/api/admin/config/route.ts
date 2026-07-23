@@ -1,0 +1,7 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { assertAdmin } from '@/lib/admin-auth';
+import { getRuntimeConfig, saveRuntimeConfig, type RuntimeConfig } from '@/lib/runtime-config';
+function clamp(n:number,min:number,max:number){ return Math.min(max, Math.max(min, Number.isFinite(n)?n:min)); }
+function validate(c:RuntimeConfig){ c.matchmaking.matchFoundDelayMs=clamp(c.matchmaking.matchFoundDelayMs,500,60000); c.matchmaking.acceptTimerSeconds=clamp(c.matchmaking.acceptTimerSeconds,3,60); c.matchmaking.requiredPlayers=clamp(c.matchmaking.requiredPlayers,2,10); c.matchmaking.minTrustScore=clamp(c.matchmaking.minTrustScore,0,100); c.matchmaking.maxRatingSpread=clamp(c.matchmaking.maxRatingSpread,50,3000); c.matchmaking.expectedQueueSeconds=clamp(c.matchmaking.expectedQueueSeconds,5,3600); c.matchmaking.mockErrorProbability=clamp(c.matchmaking.mockErrorProbability,0,1); return c; }
+export async function GET(){ try{ assertAdmin(); return NextResponse.json(await getRuntimeConfig()); } catch { return NextResponse.json({error:'Unauthorized'},{status:401}); } }
+export async function PUT(req:NextRequest){ try{ const admin=assertAdmin(); const body=validate(await req.json()); return NextResponse.json(await saveRuntimeConfig(body, admin.email)); } catch(e){ return NextResponse.json({error:e instanceof Error?e.message:'Bad request'},{status:e instanceof Error && e.message==='Unauthorized'?401:400}); } }

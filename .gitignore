@@ -4,3 +4,5 @@ out
 .env*
 npm-debug.log*
 .DS_Store
+
+.data

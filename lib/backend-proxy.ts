@@ -35,10 +35,13 @@ export async function proxyToBackend(req: NextRequest, { admin = false, method, 
   try {
     const upstream = await fetch(url, init);
     const body = await upstream.text();
-    const res = new NextResponse(body, { status: upstream.status, headers: { 'content-type': upstream.headers.get('content-type') || 'application/json' } });
+    const responseHeaders: Record<string, string> = { 'content-type': upstream.headers.get('content-type') || 'application/json', 'cache-control': 'no-store' };
+    const location = upstream.headers.get('location');
+    if (location) responseHeaders.location = location;
+    const res = new NextResponse(body, { status: upstream.status, headers: responseHeaders });
     copySetCookie(upstream, res);
     return res;
   } catch (error) {
-    return NextResponse.json({ error: 'Railway API unavailable', message: 'Production backend is offline or unreachable. Please retry shortly.', detail: error instanceof Error ? error.message : 'Unknown error' }, { status: 502 });
+    return NextResponse.json({ code: 'BACKEND_OFFLINE', error: 'Backend unavailable' }, { status: 503 });
   }
 }

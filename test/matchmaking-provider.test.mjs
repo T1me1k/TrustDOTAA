@@ -13,8 +13,8 @@ test('matchmaking no longer fabricates match-found with timer mock flow', () => 
   assert.match(provider, /\/api\/backend\/matches\/\$\{match\.id\}\/decline/);
 });
 
-test('primary and secondary role controls prevent identical roles', () => {
-  assert.match(home, /Secondary role/);
-  assert.match(home, /disabled=\{secondaryRole === item\}/);
-  assert.match(home, /disabled=\{primaryRole === item\}/);
+test('only one role is sent and legacy secondary role is removed', () => {
+  assert.doesNotMatch(home, /Secondary role|setSecondaryRole|secondaryRole/);
+  assert.doesNotMatch(provider, /secondaryRole:\s*primaryRole/);
+  assert.match(provider, /regions, role: primaryRole/);
 });

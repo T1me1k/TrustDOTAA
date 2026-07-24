@@ -1,58 +1,10 @@
-import { Card, Shell } from '@/components/Shell';
-import { heroes, matches, player } from '@/lib/data';
-
-export default function ProfilePage() {
-  return (
-    <Shell>
-      <div className="grid gap-6 lg:grid-cols-[.9fr_1.1fr]">
-        <Card>
-          <div className="flex items-center gap-4">
-            <div className="grid h-24 w-24 place-items-center rounded-3xl bg-gradient-to-br from-trust-violet to-trust-soft text-4xl font-black shadow-glow">VL</div>
-            <div>
-              <p className="text-sm uppercase tracking-[.3em] text-zinc-500">Player profile</p>
-              <h1 className="text-4xl font-black">{player.name}</h1>
-              <p className="text-trust-soft">{player.rank}</p>
-            </div>
-          </div>
-          <div className="mt-7 grid grid-cols-2 gap-3">
-            {[
-              ['TRUST Rating', player.rating],
-              ['Trust Score', player.trustScore],
-              ['Win Rate', player.winRate],
-              ['Matches', player.matches],
-              ['KDA', player.kda],
-              ['Streak', player.streak],
-            ].map(([label, value]) => (
-              <div className="rounded-2xl bg-white/5 p-4 transition hover:-translate-y-1 hover:bg-white/10" key={label}>
-                <p className="text-xs text-zinc-500">{label}</p>
-                <p className="text-2xl font-black">{value}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-        <Card>
-          <h2 className="mb-4 text-3xl font-black">Favorite heroes</h2>
-          {heroes.map((hero) => (
-            <div className="mb-3 flex items-center justify-between rounded-2xl bg-trust-panel/70 p-4 transition hover:bg-white/10" key={hero.name}>
-              <span className="font-bold">{hero.name}</span>
-              <span className="text-sm text-zinc-400">{hero.games} games · <b className="text-trust-soft">{hero.wr}</b></span>
-            </div>
-          ))}
-        </Card>
-        <Card className="lg:col-span-2">
-          <h2 className="mb-5 text-3xl font-black">Recent match history</h2>
-          {matches.map((match) => (
-            <div className="mb-3 grid gap-2 rounded-2xl bg-white/5 p-4 transition hover:bg-white/10 sm:grid-cols-6 sm:items-center" key={match.id}>
-              <b>{match.hero}</b>
-              <span className="text-zinc-400">{match.mode}</span>
-              <span className={match.result === 'Victory' ? 'text-emerald-300' : 'text-rose-300'}>{match.result}</span>
-              <span>{match.score}</span>
-              <span className={match.rating.startsWith('+') ? 'text-emerald-300' : 'text-rose-300'}>{match.rating}</span>
-              <span className="text-sm text-zinc-500">{match.time}</span>
-            </div>
-          ))}
-        </Card>
-      </div>
-    </Shell>
-  );
-}
+'use client';
+import { useEffect,useState } from 'react';
+import { Card,Shell } from '@/components/Shell';
+import { useLocale } from '@/components/LocaleProvider';
+type Match={id:string;result?:string;role?:string;region?:string;ratingDelta?:number;createdAt?:string};
+type Profile={steam?:{avatar?:string;personaName?:string;profileUrl?:string;steamId?:string};avatar?:string;personaName?:string;steamProfileUrl?:string;trustRating?:number;rating?:number;trustScore?:number;preferredRole?:string;preferredRegions?:string[];createdAt?:string;matches?:Match[];matchHistory?:Match[];restrictions?:Array<{id?:string;type?:string;reason?:string;expiresAt?:string}>};
+export default function ProfilePage(){const {t,date,number}=useLocale();const [profile,setProfile]=useState<Profile|null>(null);const [state,setState]=useState<'loading'|'guest'|'offline'|'restricted'>('loading');useEffect(()=>{fetch('/api/backend/me',{cache:'no-store',credentials:'include'}).then(async r=>{if(r.ok){setProfile(await r.json());setState('guest')}else setState(r.status===403?'restricted':r.status===503?'offline':'guest')}).catch(()=>setState('offline'))},[]);async function logoutAll(){if(!confirm(t('logoutAll')))return;const r=await fetch('/api/backend/auth/logout-all',{method:'POST'});if(r.ok)location.href='/';}
+ if(state==='loading')return <Shell><Card>{t('loading')}</Card></Shell>;if(!profile)return <Shell><Card><h1 className="text-3xl font-black">{state==='offline'?t('offline'):state==='restricted'?t('restricted'):t('sessionExpired')}</h1><a className="mt-5 inline-block rounded-2xl bg-white px-5 py-3 font-bold text-black" href="/api/backend/auth/steam/start">{t('signIn')}</a></Card></Shell>;
+ const steam=profile.steam||{avatar:profile.avatar,personaName:profile.personaName,profileUrl:profile.steamProfileUrl};const matches=profile.matches||profile.matchHistory||[];return <Shell><div className="grid gap-6 lg:grid-cols-2"><Card><div className="flex items-center gap-4"><img src={steam.avatar} alt="" className="h-24 w-24 rounded-3xl"/><div><p className="text-sm uppercase tracking-[.3em] text-zinc-500">{t('account')}</p><h1 className="text-4xl font-black">{steam.personaName}</h1><a className="text-trust-soft" target="_blank" rel="noreferrer" href={steam.profileUrl||profile.steamProfileUrl}>{t('steamProfile')}</a></div></div><div className="mt-7 grid grid-cols-2 gap-3"><Stat label={t('trustRating')} value={number(profile.trustRating??profile.rating??0)}/><Stat label={t('trustScore')} value={number(profile.trustScore??0)}/><Stat label={t('role')} value={profile.preferredRole||'—'}/><Stat label={t('regions')} value={(profile.preferredRegions||[]).join(', ')||'—'}/><Stat label={t('registered')} value={profile.createdAt?date(profile.createdAt):'—'}/></div><button onClick={logoutAll} className="mt-6 rounded-2xl border border-rose-300/30 px-5 py-3 text-rose-200">{t('logoutAll')}</button></Card><Card><h2 className="text-3xl font-black">{t('restrictions')}</h2>{profile.restrictions?.length?profile.restrictions.map((r,i)=><div key={r.id||i} className="mt-3 rounded-2xl bg-rose-500/10 p-4">{r.type}: {r.reason}{r.expiresAt&&` · ${date(r.expiresAt)}`}</div>):<p className="mt-4 text-zinc-400">{t('noRestrictions')}</p>}</Card><Card className="lg:col-span-2"><h2 className="text-3xl font-black">{t('history')}</h2>{matches.length?matches.map(m=><div key={m.id} className="mt-3 grid gap-2 rounded-2xl bg-white/5 p-4 sm:grid-cols-5"><b>{m.id}</b><span>{m.result}</span><span>{m.role}</span><span>{m.region}</span><span>{m.ratingDelta}</span></div>):<p className="mt-4 text-zinc-400">{t('noMatches')}</p>}</Card></div></Shell>}
+function Stat({label,value}:{label:string;value:string}){return <div className="rounded-2xl bg-white/5 p-4"><p className="text-xs text-zinc-500">{label}</p><p className="text-xl font-black">{value}</p></div>}

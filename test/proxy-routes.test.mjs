@@ -65,3 +65,43 @@ test('locale uses an SSR cookie and English dictionary fallback', async () => {
   assert.match(locale, /ru\[key\]\)\|\|en\[key\]/);
   assert.match(locale, /Intl\.PluralRules|Intl\.DateTimeFormat|Intl\.NumberFormat/);
 });
+
+test('public runtime config adapts incomplete backend envelopes with safe nested fallbacks', async () => {
+  const runtime = await readFile('lib/runtime-config.ts', 'utf8');
+  const route = await readFile('app/api/backend/config/public/route.ts', 'utf8');
+  const home = await readFile('components/HomeClient.tsx', 'utf8');
+  assert.match(route, /adaptPublicRuntimeConfig/);
+  assert.match(runtime, /payload\.config/);
+  assert.match(runtime, /defaultRuntimeConfig/);
+  assert.match(runtime, /matchmaking_enabled/);
+  assert.match(runtime, /play_button_enabled/);
+  assert.match(home, /config\?\.content\?\.stats \?\? fallbackStats/);
+});
+
+test('/me maps expected 401 to a guest response and clients consume response.player', async () => {
+  const me = await readFile('app/api/backend/me/route.ts', 'utf8');
+  const nav = await readFile('components/Nav.tsx', 'utf8');
+  const profile = await readFile('app/profile/page.tsx', 'utf8');
+  assert.match(me, /upstream\.status === 401/);
+  assert.match(me, /authenticated: false, player: null/);
+  assert.match(nav + profile, /data\.player/);
+  assert.match(nav + profile, /personaName/);
+  assert.match(nav + profile, /avatarUrl/);
+  assert.doesNotMatch(nav + profile, /account\?\.steam|profile\.steam/);
+});
+
+test('Steam proxy preserves manual redirects, Location and all Set-Cookie values', () => {
+  assert.match(proxy, /redirect: 'manual'/);
+  assert.match(proxy, /responseHeaders\.location/);
+  assert.match(proxy, /getSetCookie/);
+  assert.match(proxy, /headers\.append\('set-cookie'/);
+});
+
+test('guest rendering and localized error boundary are present', async () => {
+  const errorBoundary = await readFile('app/error.tsx', 'utf8');
+  const layout = await readFile('app/layout.tsx', 'utf8');
+  assert.match(layout, /MatchmakingProvider/);
+  assert.match(errorBoundary, /t\('clientErrorMessage'\)/);
+  assert.match(errorBoundary, /t\('reload'\)/);
+  assert.doesNotMatch(errorBoundary, /error\.stack/);
+});

@@ -30,7 +30,7 @@ export async function proxyToBackend(req: NextRequest, { admin = false, method, 
     headers.set('x-admin-api-key', key);
     headers.set('authorization', `Bearer ${key}`);
   }
-  const init: RequestInit = { method: method || req.method, headers, cache: 'no-store' };
+  const init: RequestInit = { method: method || req.method, headers, cache: 'no-store', credentials: 'include' };
   if (!['GET', 'HEAD'].includes(init.method || 'GET')) init.body = await req.text();
   try {
     const upstream = await fetch(url, init);
@@ -39,6 +39,6 @@ export async function proxyToBackend(req: NextRequest, { admin = false, method, 
     copySetCookie(upstream, res);
     return res;
   } catch (error) {
-    return NextResponse.json({ error: 'Railway API unavailable', detail: error instanceof Error ? error.message : 'Unknown error' }, { status: 502 });
+    return NextResponse.json({ error: 'Railway API unavailable', message: 'Production backend is offline or unreachable. Please retry shortly.', detail: error instanceof Error ? error.message : 'Unknown error' }, { status: 502 });
   }
 }

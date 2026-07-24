@@ -7,10 +7,10 @@ const home = await readFile('components/HomeClient.tsx', 'utf8');
 
 test('matchmaking no longer fabricates match-found with timer mock flow', () => {
   assert.doesNotMatch(provider, /setTimeout\(\(\) => setPhase\('found'/);
-  assert.match(provider, /\/api\/queue\/join/);
-  assert.match(provider, /\/api\/queue\/status/);
-  assert.match(provider, /\/api\/matches\/\$\{match\.id\}\/accept/);
-  assert.match(provider, /\/api\/matches\/\$\{match\.id\}\/decline/);
+  assert.match(provider, /\/api\/backend\/queue\/join/);
+  assert.match(provider, /\/api\/backend\/queue\/status/);
+  assert.match(provider, /\/api\/backend\/matches\/\$\{match\.id\}\/accept/);
+  assert.match(provider, /\/api\/backend\/matches\/\$\{match\.id\}\/decline/);
 });
 
 test('primary and secondary role controls prevent identical roles', () => {

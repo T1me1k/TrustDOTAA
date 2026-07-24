@@ -9,3 +9,6 @@ body { margin: 0; background: #070709; color: white; }
 ::selection { background: rgba(168, 85, 247, .45); }
 .glass { @apply border border-white/10 bg-white/[0.045] backdrop-blur-2xl shadow-panel; }
 .text-gradient { @apply bg-gradient-to-r from-white via-trust-soft to-trust-glow bg-clip-text text-transparent; }
+.primary { border-radius:.75rem; background:#7559ff; padding:.75rem 1.25rem; font-weight:800; color:white; }
+.primary:disabled { cursor:not-allowed; opacity:.5; }
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior:auto!important; animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; } }

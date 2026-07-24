@@ -31,6 +31,36 @@ export const defaultRuntimeConfig: RuntimeConfig = {
   admin:{storeWarning:'Railway PostgreSQL admin API is connected.',roles:['Owner','Admin','Operator','Support','Read Only'],currentRole:'Owner'}
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** Adapt the small backend envelope into a complete, safe UI configuration. */
+export function adaptPublicRuntimeConfig(payload: unknown): RuntimeConfig {
+  const envelope = isRecord(payload) && isRecord(payload.config) ? payload.config : payload;
+  const source = isRecord(envelope) ? envelope : {};
+  const mergeObject = (fallback: Record<string, unknown>, value: unknown): Record<string, unknown> => {
+    if (!isRecord(value)) return { ...fallback };
+    const result = { ...fallback };
+    for (const key of Object.keys(fallback)) {
+      const next = value[key];
+      if (next === undefined || next === null) continue;
+      const original = fallback[key];
+      if (Array.isArray(original)) { if (Array.isArray(next)) result[key] = next; }
+      else if (isRecord(original)) result[key] = mergeObject(original, next);
+      else if (typeof next === typeof original) result[key] = next;
+    }
+    return result;
+  };
+  const result = mergeObject(defaultRuntimeConfig as unknown as Record<string, unknown>, source) as unknown as RuntimeConfig;
+  if (typeof source.matchmaking_enabled === 'boolean') {
+    result.matchmaking.enabled = source.matchmaking_enabled;
+    result.featureFlags.matchmaking_enabled.enabled = source.matchmaking_enabled;
+  }
+  if (typeof source.play_button_enabled === 'boolean') result.featureFlags.play_button_enabled.enabled = source.play_button_enabled;
+  return result;
+}
+
 const dataDir = path.join(process.cwd(), '.data');
 const configFile = path.join(dataDir, 'runtime-config.json');
 export async function getRuntimeConfig(): Promise<RuntimeConfig> { try { const raw=await fs.readFile(configFile,'utf8'); return { ...defaultRuntimeConfig, ...JSON.parse(raw) }; } catch { return defaultRuntimeConfig; } }

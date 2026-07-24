@@ -11,6 +11,16 @@ type Match = { id?: string; roomId?: string; status?: string; acceptedPlayers?: 
 type MatchmakingContextValue = { acceptCountdown: number; acceptedPlayers: number; cancelSearch: () => void; launchDota: () => void; phase: MatchPhase; primaryRole: string; regions: string[]; resetDemo: () => void; searchSeconds: number; setPrimaryRole: (role: string) => void; toggleRegion: (region: string) => void; startSearch: () => void; acceptMatch: () => void; declineMatch: () => void; lastError: string; match: Match | null };
 const MatchmakingContext = createContext<MatchmakingContextValue | null>(null);
 
+function normalizeMatchDetails(data: { match?: Match; players?: Player[] } & Match, matchId?: string): Match {
+  const base = data.match || data;
+  const teams = data.players?.reduce<{ radiant: Player[]; dire: Player[] }>((result, player) => {
+    const team = String(player.team || '').toLowerCase();
+    (team === 'dire' ? result.dire : result.radiant).push(player);
+    return result;
+  }, { radiant: [], dire: [] });
+  return { ...base, id: base.id || matchId, ...(teams ? { teams } : {}) };
+}
+
 async function api(path: string, init?: RequestInit) {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 12000);
@@ -18,7 +28,7 @@ async function api(path: string, init?: RequestInit) {
     const res = await fetch(path, { ...init, cache: 'no-store', credentials: 'include', headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) }, signal: controller.signal });
     const text = await res.text();
     const data = text ? JSON.parse(text) : {};
-    if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { status: res.status });
+    if (!res.ok) throw Object.assign(new Error(data.error?.message || data.error || data.message || res.statusText), { status: res.status });
     return data;
   } finally { window.clearTimeout(timeout); }
 }
@@ -38,17 +48,17 @@ export function MatchmakingProvider({ children }: { children: React.ReactNode })
   function toggleRegion(value: string) { setRegions(current => { const next=current.includes(value)?current.filter(v=>v!==value):current.length<3?[...current,value]:current; if(!next.length)return current; localStorage.setItem('trust-regions',JSON.stringify(next)); return next; }); }
   function setPrimaryRole(value: string) { setPrimaryRoleState(value); localStorage.setItem('trust-primary-role', value); }
   function fail(error: unknown) { const status = (error as { status?: number }).status; setLastError(error instanceof Error ? error.message : 'Server error'); setPhase(status === 401 ? 'unauthorized' : status === 403 ? 'disabled' : error instanceof DOMException && error.name === 'AbortError' ? 'timeout' : status === 502 ? 'offline' : 'error'); }
-  async function ensureGuest() { try { await api('/api/backend/me'); } catch { await api('/api/backend/auth/guest', { method: 'POST', body: JSON.stringify({}) }); } }
-  async function startSearch() { if (!runtimeConfig?.matchmaking.enabled || !runtimeConfig?.featureFlags.matchmaking_enabled?.enabled || !runtimeConfig?.featureFlags.play_button_enabled?.enabled) return setPhase('disabled'); setPhase('loading'); setLastError(''); setSearchSeconds(0); setMatch(null); try { await ensureGuest(); await api('/api/backend/queue/join', { method: 'POST', body: JSON.stringify({ regions, role: primaryRole }) }); setPhase('searching'); } catch (e) { fail(e); } }
-  async function cancelSearch() { try { await api('/api/backend/queue/cancel', { method: 'POST', body: JSON.stringify({ matchId: match?.id }) }); } catch {} setSearchSeconds(0); setAcceptCountdown(runtimeConfig?.matchmaking.acceptTimerSeconds || 10); setAcceptedPlayers(0); setMatch(null); setPhase('empty'); }
-  async function acceptMatch() { if (!match?.id) return; try { const data = await api(`/api/backend/matches/${match.id}/accept`, { method: 'POST', body: JSON.stringify({}) }); setMatch(data.match || data); setAcceptedPlayers(data.acceptedPlayers || data.match?.acceptedPlayers || 1); setPhase('accepted'); } catch (e) { fail(e); } }
+  async function ensureGuest() { const data = await api('/api/backend/me'); if (!data.player && data.guestAllowed !== false) await api('/api/backend/auth/guest', { method: 'POST', body: JSON.stringify({}) }); }
+  async function startSearch() { if (!runtimeConfig?.matchmaking?.enabled || !runtimeConfig?.featureFlags.matchmaking_enabled?.enabled || !runtimeConfig?.featureFlags.play_button_enabled?.enabled) return setPhase('disabled'); setPhase('loading'); setLastError(''); setSearchSeconds(0); setMatch(null); try { await ensureGuest(); await api('/api/backend/queue/join', { method: 'POST', body: JSON.stringify({ regions, primaryRole }) }); setPhase('searching'); } catch (e) { fail(e); } }
+  async function cancelSearch() { try { await api('/api/backend/queue/cancel', { method: 'POST', body: JSON.stringify({ matchId: match?.id }) }); } catch {} setSearchSeconds(0); setAcceptCountdown(runtimeConfig?.matchmaking?.acceptTimerSeconds || 10); setAcceptedPlayers(0); setMatch(null); setPhase('empty'); }
+  async function acceptMatch() { if (!match?.id) return; try { const matchId = match.id; await api(`/api/backend/matches/${matchId}/accept`, { method: 'POST', body: JSON.stringify({}) }); const details = await api(`/api/backend/matches/${matchId}`); const next = normalizeMatchDetails(details, matchId); setMatch(next); setAcceptedPlayers(next.acceptedPlayers || 1); setPhase('accepted'); } catch (e) { fail(e); } }
   async function declineMatch() { if (match?.id) { try { await api(`/api/backend/matches/${match.id}/decline`, { method: 'POST', body: JSON.stringify({}) }); } catch {} } await cancelSearch(); }
   function launchDota() { window.location.href = 'steam://rungameid/570'; }
-  function resetDemo() { setSearchSeconds(0); setAcceptCountdown(runtimeConfig?.matchmaking.acceptTimerSeconds || 10); setAcceptedPlayers(0); setMatch(null); setLastError(''); setPhase('empty'); }
+  function resetDemo() { setSearchSeconds(0); setAcceptCountdown(runtimeConfig?.matchmaking?.acceptTimerSeconds || 10); setAcceptedPlayers(0); setMatch(null); setLastError(''); setPhase('empty'); }
 
-  useEffect(() => { if (phase !== 'searching') return; const tick = window.setInterval(() => setSearchSeconds((v) => v + 1), 1000); const poll = window.setInterval(async () => { try { const data = await api('/api/backend/queue/status'); if (data.match || data.matchId) { const found = data.match || await api(`/api/backend/matches/${data.matchId}`); setMatch(found.match || found); setAcceptedPlayers(found.acceptedPlayers || found.match?.acceptedPlayers || 0); setAcceptCountdown(found.acceptTimerSeconds || runtimeConfig?.matchmaking.acceptTimerSeconds || 10); setPhase('found'); } } catch (e) { fail(e); } }, 2500); return () => { window.clearInterval(tick); window.clearInterval(poll); }; }, [phase, runtimeConfig?.matchmaking.acceptTimerSeconds]);
+  useEffect(() => { if (phase !== 'searching') return; const tick = window.setInterval(() => setSearchSeconds((v) => v + 1), 1000); const poll = window.setInterval(async () => { try { const data = await api('/api/backend/queue/status'); if (data.match || data.matchId) { const matchId = data.matchId || data.match?.id; const found = data.match && !data.players ? data : await api(`/api/backend/matches/${matchId}`); const next = normalizeMatchDetails(found, matchId); setMatch(next); setAcceptedPlayers(next.acceptedPlayers || 0); setAcceptCountdown(found.acceptTimerSeconds || runtimeConfig?.matchmaking?.acceptTimerSeconds || 10); setPhase('found'); } } catch (e) { fail(e); } }, 2500); return () => { window.clearInterval(tick); window.clearInterval(poll); }; }, [phase, runtimeConfig?.matchmaking?.acceptTimerSeconds]);
   useEffect(() => { if (phase !== 'found') return; const countdown = window.setInterval(() => setAcceptCountdown((value) => { if (value <= 1) { setPhase('timeout'); return 0; } return value - 1; }), 1000); return () => window.clearInterval(countdown); }, [phase]);
-  useEffect(() => { if (phase !== 'accepted') return; const poll = window.setInterval(async () => { if (!match?.id) return; try { const data = await api(`/api/backend/matches/${match.id}`); const next = data.match || data; setMatch(next); setAcceptedPlayers(next.acceptedPlayers || 1); if (['draft','connecting','ready'].includes(String(next.status))) setPhase(next.status); } catch (e) { fail(e); } }, 2500); return () => window.clearInterval(poll); }, [phase, match?.id]);
+  useEffect(() => { if (phase !== 'accepted') return; const poll = window.setInterval(async () => { if (!match?.id) return; try { const data = await api(`/api/backend/matches/${match.id}`); const next = normalizeMatchDetails(data, match.id); setMatch(next); setAcceptedPlayers(next.acceptedPlayers || 1); if (['draft','connecting','ready'].includes(String(next.status))) setPhase(next.status as MatchPhase); } catch (e) { fail(e); } }, 2500); return () => window.clearInterval(poll); }, [phase, match?.id]);
 
   return <MatchmakingContext.Provider value={{ acceptCountdown, acceptedPlayers, cancelSearch, launchDota, phase, primaryRole, regions, resetDemo, searchSeconds, setPrimaryRole, toggleRegion, startSearch, acceptMatch, declineMatch, lastError, match }}>{children}<GlobalMatchOverlay /></MatchmakingContext.Provider>;
 }

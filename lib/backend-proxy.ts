@@ -30,7 +30,9 @@ export async function proxyToBackend(req: NextRequest, { admin = false, method, 
     headers.set('x-admin-api-key', key);
     headers.set('authorization', `Bearer ${key}`);
   }
-  const init: RequestInit = { method: method || req.method, headers, cache: 'no-store', credentials: 'include' };
+  // Redirects must reach the browser. Following an OpenID redirect here would make
+  // Vercel contact Steam itself and would also lose the browser's cookie boundary.
+  const init: RequestInit = { method: method || req.method, headers, cache: 'no-store', credentials: 'include', redirect: 'manual' };
   if (!['GET', 'HEAD'].includes(init.method || 'GET')) init.body = await req.text();
   try {
     const upstream = await fetch(url, init);

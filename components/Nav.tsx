@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Menu, Shield, UserCircle, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRuntimeConfig } from '@/components/useRuntimeConfig';
 
 const links = [
@@ -14,6 +14,8 @@ const links = [
 export function Nav() {
   const [open, setOpen] = useState(false);
   const [language, setLanguage] = useState('ENG');
+  useEffect(() => { setLanguage(localStorage.getItem('trust-language') || 'ENG'); }, []);
+  function switchLanguage() { const next = language === 'ENG' ? 'RU' : 'ENG'; setLanguage(next); localStorage.setItem('trust-language', next); document.documentElement.lang = next === 'ENG' ? 'en' : 'ru'; }
   const config = useRuntimeConfig();
   const visibleLinks = config?.content.navLinks || links;
   return (
@@ -28,16 +30,16 @@ export function Nav() {
         <div className="hidden items-center gap-7 text-sm text-zinc-300 md:flex">
           {visibleLinks.map((link) => (
             <Link className="transition hover:-translate-y-0.5 hover:text-white" key={link.href} href={link.href}>
-              {link.label}
+              {language === 'RU' ? ({ Queue: 'Очередь', Leaderboard: 'Рейтинг', Patch: 'Патч', Profile: 'Профиль' } as Record<string,string>)[link.label] || link.label : link.label}
             </Link>
           ))}
         </div>
         <div className="hidden items-center gap-3 md:flex">
-          <button className="rounded-full bg-white px-5 py-2 text-sm font-bold text-trust-black transition hover:bg-trust-soft">Connect Steam</button>
+          <button className="rounded-full bg-white px-5 py-2 text-sm font-bold text-trust-black transition hover:bg-trust-soft">{language === 'RU' ? 'Подключить Steam' : 'Connect Steam'}</button>
           <Link aria-label="Open profile" href="/profile" className="rounded-full border border-white/10 bg-white/5 p-2 text-trust-soft transition hover:border-trust-soft hover:bg-trust-violet/20">
             <UserCircle />
           </Link>
-          <button aria-label="Switch language" onClick={() => setLanguage(language === 'ENG' ? 'RU' : 'ENG')} className="rounded-full border border-trust-soft/30 bg-trust-violet/10 px-3 py-2 text-xs font-black text-trust-soft">{language}</button>
+          <button aria-label="Switch language" onClick={switchLanguage} className="rounded-full border border-trust-soft/30 bg-trust-violet/10 px-3 py-2 text-xs font-black text-trust-soft">{language}</button>
         </div>
         <button aria-label="Toggle menu" className="md:hidden" onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</button>
       </nav>
@@ -45,7 +47,7 @@ export function Nav() {
         <div className="grid gap-3 border-t border-white/10 px-4 py-4 md:hidden">
           {[...visibleLinks, { href: '/profile', label: 'Profile' }].map((link) => (
             <Link onClick={() => setOpen(false)} className="rounded-2xl bg-white/5 p-3 transition hover:bg-white/10" key={link.href} href={link.href}>
-              {link.label}
+              {language === 'RU' ? ({ Queue: 'Очередь', Leaderboard: 'Рейтинг', Patch: 'Патч', Profile: 'Профиль' } as Record<string,string>)[link.label] || link.label : link.label}
             </Link>
           ))}
         </div>

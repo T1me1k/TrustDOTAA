@@ -19,6 +19,7 @@ export default function OpsDashboard() {
   const [api, setApi] = useState<ApiState>({ online: false, error: '' });
   const [active, setActive] = useState('Overview');
   const [dirty, setDirty] = useState(false);
+  const [savedConfig, setSavedConfig] = useState<RuntimeConfig | null>(null);
   const [toast, setToast] = useState('');
   useEffect(() => { void refresh(); }, []);
   async function refresh() {
@@ -26,10 +27,21 @@ export default function OpsDashboard() {
       const [runtime, dashboard, queues, matches, audit] = await Promise.all([
         loadJson('/api/admin/config'), loadJson('/api/admin/dashboard'), loadJson('/api/admin/queues'), loadJson('/api/admin/matches'), loadJson('/api/admin/audit'),
       ]);
-      setConfig(runtime); setApi({ dashboard, queues: asArray(queues), matches: asArray(matches), audit: asArray(audit), online: true, error: '' });
+      setConfig(runtime); setSavedConfig(structuredClone(runtime)); setDirty(false); setApi({ dashboard, queues: asArray(queues), matches: asArray(matches), audit: asArray(audit), online: true, error: '' });
     } catch (error) { setApi((prev) => ({ ...prev, online: false, error: error instanceof Error ? error.message : 'Backend unavailable' })); }
   }
-  async function save() { if (!config) return; const res = await fetch('/api/admin/config', { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) }); const data = await res.json().catch(() => ({})); if (res.ok) { setConfig(data); setDirty(false); setToast('Saved to production backend'); } else setToast(`Save failed: ${data.error || data.message || res.statusText}`); }
+  async function save() {
+    if (!config || !savedConfig) return;
+    const changes = (Object.keys(config) as Array<keyof RuntimeConfig>).filter((key) => JSON.stringify(config[key]) !== JSON.stringify(savedConfig[key]));
+    try {
+      for (const key of changes) {
+        const res = await fetch('/api/admin/config', { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value: config[key] }) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || data.message || res.statusText);
+      }
+      setSavedConfig(structuredClone(config)); setDirty(false); setToast('Saved to production backend');
+    } catch (error) { setToast(`Save failed: ${error instanceof Error ? error.message : 'Backend unavailable'}`); }
+  }
   async function cancelMatch(id: string) { const res = await fetch(`/api/admin/matches?id=${encodeURIComponent(id)}&action=cancel`, { method: 'POST', credentials: 'include' }); const data = await res.json().catch(() => ({})); setToast(res.ok ? `Cancel requested for ${id}` : `Cancel failed: ${data.error || data.message || res.statusText}`); if (res.ok) void refresh(); }
   async function logout() { await fetch('/api/admin/auth/logout', { method: 'POST', credentials: 'include' }); location.href = '/ops/login'; }
   function patch(mut: (c: RuntimeConfig) => void) { if (!config) return; const next = structuredClone(config); mut(next); setConfig(next); setDirty(true); }

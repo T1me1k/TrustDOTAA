@@ -68,6 +68,6 @@ test('config writes use the backend per-key PATCH contract rather than full PUT'
   assert.match(config, /JSON\.stringify\(\{ value \}\)/);
   assert.doesNotMatch(config, /export async function PUT/);
   assert.match(dashboard, /method: 'PATCH'/);
-  assert.match(dashboard, /JSON\.stringify\(\{ key, value: config\[key\] \}\)/);
+  assert.match(dashboard, /JSON\.stringify\(\{ key, value \}\)/);
   assert.doesNotMatch(dashboard, /method: 'PUT'/);
 });

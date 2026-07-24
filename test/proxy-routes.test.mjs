@@ -48,3 +48,20 @@ test('admin backend key is absent from client bundle source', async () => {
     assert.doesNotMatch(source, /BACKEND_ADMIN_API_KEY|NEXT_PUBLIC_.*ADMIN/);
   }
 });
+
+test('Steam authentication start and callback stay in the BFF', async () => {
+  const start = await readFile('app/api/backend/auth/steam/start/route.ts', 'utf8');
+  const callback = await readFile('app/api/backend/auth/steam/callback/route.ts', 'utf8');
+  assert.match(start, /\/v1\/auth\/steam\/start/);
+  assert.match(callback, /\/v1\/auth\/steam\/callback/);
+  assert.match(callback, /\/profile/);
+  assert.doesNotMatch(start + callback, /STEAM_API_KEY|NEXT_PUBLIC/);
+});
+
+test('locale uses an SSR cookie and English dictionary fallback', async () => {
+  const layout = await readFile('app/layout.tsx', 'utf8');
+  const locale = await readFile('components/LocaleProvider.tsx', 'utf8');
+  assert.match(layout, /trust_locale/);
+  assert.match(locale, /ru\[key\]\)\|\|en\[key\]/);
+  assert.match(locale, /Intl\.PluralRules|Intl\.DateTimeFormat|Intl\.NumberFormat/);
+});

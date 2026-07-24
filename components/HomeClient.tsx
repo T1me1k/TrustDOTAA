@@ -7,9 +7,11 @@ import { Card, Pill, Shell } from '@/components/Shell';
 import { formatTime, useMatchmaking } from '@/components/MatchmakingProvider';
 import { regions as fallbackRegions, roles as fallbackRoles, stats as fallbackStats } from '@/lib/data';
 import { useRuntimeConfig } from '@/components/useRuntimeConfig';
+import { useLocale } from '@/components/LocaleProvider';
 
 export default function HomeClient() {
-  const { cancelSearch, phase, primaryRole, secondaryRole, region, resetDemo, searchSeconds, setPrimaryRole, setSecondaryRole, setRegion, startSearch } = useMatchmaking();
+  const { cancelSearch, phase, primaryRole, regions: selectedRegions, resetDemo, searchSeconds, setPrimaryRole, toggleRegion, startSearch } = useMatchmaking();
+  const { t } = useLocale();
   const config = useRuntimeConfig();
   const stats = config?.content.stats || fallbackStats;
   const regions = config?.regions.filter((item) => item.enabled).map((item) => item.name) || fallbackRegions;
@@ -41,16 +43,13 @@ export default function HomeClient() {
 
         <section id="queue" className="grid gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">
-            <div className="mb-6 flex items-center gap-3"><Radar className="text-trust-soft" /><h2 className="text-3xl font-black">Region & roles</h2></div>
-            <p className="mb-3 text-sm text-zinc-400">Region</p>
-            <div className="flex flex-wrap gap-3">{regions.map((item) => <button onClick={() => setRegion(item)} className={`rounded-full px-5 py-2 text-sm font-bold transition hover:scale-105 ${region === item ? 'bg-white text-trust-black' : 'bg-white/5 text-zinc-300'}`} key={item}>{item}</button>)}</div>
-            <p className="mb-3 mt-6 text-sm text-zinc-400">Primary role</p>
-            <div className="grid gap-3 sm:grid-cols-5">{roles.map((item) => <RoleButton active={primaryRole === item} disabled={secondaryRole === item} key={item} label={item} onClick={() => setPrimaryRole(item)} />)}</div>
-            <p className="mb-3 mt-6 text-sm text-zinc-400">Secondary role</p>
-            <div className="grid gap-3 sm:grid-cols-5">{roles.map((item) => <RoleButton active={secondaryRole === item} disabled={primaryRole === item} key={item} label={item} onClick={() => setSecondaryRole(item)} />)}</div>
-            
+            <div className="mb-6 flex items-center gap-3"><Radar className="text-trust-soft" /><h2 className="text-3xl font-black">{t('regionRole')}</h2></div>
+            <p className="mb-3 text-sm text-zinc-400">{t('regions')} · {t('selected',{count:selectedRegions.length})}</p>
+            <div className="flex flex-wrap gap-3">{regions.map((item) => { const active=selectedRegions.includes(item); const disabled=!active&&selectedRegions.length>=3; return <button disabled={disabled} onClick={() => toggleRegion(item)} className={`rounded-full px-5 py-2 text-sm font-bold transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-30 ${active ? 'bg-white text-trust-black' : 'bg-white/5 text-zinc-300'}`} key={item}>{item}</button>; })}</div>
+            <p className="mb-3 mt-6 text-sm text-zinc-400">{t('role')}</p>
+            <div className="grid gap-3 sm:grid-cols-5">{roles.map((item) => <RoleButton active={primaryRole === item} disabled={false} key={item} label={item} onClick={() => setPrimaryRole(item)} />)}</div>
           </Card>
-          <Card id="scenario"><p className="text-zinc-400">Matchmaking</p><h3 className="mt-2 text-4xl font-black">{isSearching ? formatTime(searchSeconds) : phase === 'empty' ? 'Ready' : phase.toUpperCase()}</h3><p className="mt-4 text-sm text-zinc-400">Selected: <b className="text-white">{region}</b> · <b className="text-white">{primaryRole}</b> / <b className="text-white">{secondaryRole}</b></p>{!queueEnabled && <p className="mt-3 rounded-2xl border border-rose-300/30 bg-rose-500/10 p-3 text-sm text-rose-100">{config?.matchmaking.disabledMessage || config?.content.queueDisabledText}</p>}<div className="mt-6 grid gap-3"><button onClick={startSearch} disabled={isSearching || !queueEnabled} className="rounded-2xl bg-trust-violet py-4 font-black shadow-glow transition hover:bg-trust-glow disabled:cursor-wait disabled:opacity-60">{isSearching ? <span className="inline-flex items-center gap-2"><Loader2 className="animate-spin" /> Searching...</span> : 'Play'}</button>{isSearching && <button onClick={cancelSearch} className="rounded-2xl border border-white/10 py-3 font-bold transition hover:border-rose-300/50 hover:bg-rose-500/10 hover:text-rose-200">Cancel search</button>}<button onClick={resetDemo} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 py-3 font-bold transition hover:bg-white/10"><RotateCcw size={18} /> Reset demo</button></div></Card>
+          <Card id="scenario"><p className="text-zinc-400">Matchmaking</p><h3 className="mt-2 text-4xl font-black">{isSearching ? formatTime(searchSeconds) : phase === 'empty' ? 'Ready' : phase.toUpperCase()}</h3><p className="mt-4 text-sm text-zinc-400">Selected: <b className="text-white">{selectedRegions.join(', ')}</b> · <b className="text-white">{primaryRole}</b></p>{!queueEnabled && <p className="mt-3 rounded-2xl border border-rose-300/30 bg-rose-500/10 p-3 text-sm text-rose-100">{config?.matchmaking.disabledMessage || config?.content.queueDisabledText}</p>}<div className="mt-6 grid gap-3"><button onClick={startSearch} disabled={isSearching || !queueEnabled} className="rounded-2xl bg-trust-violet py-4 font-black shadow-glow transition hover:bg-trust-glow disabled:cursor-wait disabled:opacity-60">{isSearching ? <span className="inline-flex items-center gap-2"><Loader2 className="animate-spin" /> Searching...</span> : 'Play'}</button>{isSearching && <button onClick={cancelSearch} className="rounded-2xl border border-white/10 py-3 font-bold transition hover:border-rose-300/50 hover:bg-rose-500/10 hover:text-rose-200">Cancel search</button>}<button onClick={resetDemo} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 py-3 font-bold transition hover:bg-white/10"><RotateCcw size={18} /> Reset demo</button></div></Card>
         </section>
 
         <Card><div className="flex items-center gap-4"><span className="grid h-14 w-14 place-items-center rounded-2xl bg-trust-violet/20 text-trust-soft"><Clock /></span><div><h2 className="text-3xl font-black">Demo states</h2><p className="mt-1 text-zinc-400">Empty, loading/searching, error, match found, accept, match room, connection, launch and completed screens are handled globally across every page.</p></div></div></Card>

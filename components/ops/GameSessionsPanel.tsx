@@ -54,11 +54,11 @@ export default function GameSessionsPanel() {
 
   const loadMatches = useCallback(async () => {
     const payload = await loadJson('/api/admin/matches');
-    const next = adaptMatches(payload).sort((a, b) => matchPriority(a.status) - matchPriority(b.status));
+    const next = adaptMatches(payload).filter(match => activeMatchStates.has(match.status ?? '')).sort((a, b) => matchPriority(a.status) - matchPriority(b.status));
     setMatches(next);
     setSelectedMatchId(current => {
       if (current && next.some(match => match.id === current)) return current;
-      return next.find(match => activeMatchStates.has(match.status ?? ''))?.id ?? next[0]?.id ?? '';
+      return next[0]?.id ?? '';
     });
   }, []);
 

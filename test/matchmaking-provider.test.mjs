@@ -17,7 +17,7 @@ test('matchmaking is backed by server queue and match endpoints', () => {
 test('players can select one to five roles without a secondary-role model', () => {
   assert.doesNotMatch(home + provider, /Secondary role|setSecondaryRole|secondaryRole:/);
   assert.match(provider, /selectedRoles/);
-  assert.match(provider, /roles: selectedRoles/);
+  assert.match(provider, /roles: queueRoles/);
   assert.match(provider, /trust-roles/);
   assert.match(home, /selectedRoles\.includes/);
   assert.match(home, /toggleRole/);

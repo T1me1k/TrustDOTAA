@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, BarChart3, LogOut, Shield, ToggleLeft, Wifi, WifiOff } from 'lucide-react';
+import { AlertTriangle, BarChart3, LogOut, Shield, SlidersHorizontal, ToggleLeft, Wifi, WifiOff } from 'lucide-react';
 import Link from 'next/link';
 import { adaptAudit, adaptConfig, adaptDashboard, adaptFeatureFlags, adaptMatches, adaptPatches, adaptPlayers, adaptQueues, errorMessage, loadJson, type AuditEntry, type DashboardStats, type FeatureFlag, type Match, type Patch, type Player, type QueueEntry, type RuntimeConfigEntry } from '@/lib/ops-api';
 
@@ -38,6 +38,17 @@ export default function OpsDashboard() {
     setLoading(false);
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get('section');
+    if (requested && sections.includes(requested)) setActive(requested);
+  }, []);
+
+  function selectSection(section: string) {
+    setActive(section);
+    const url = new URL(window.location.href);
+    url.searchParams.set('section', section);
+    window.history.replaceState(null, '', url);
+  }
 
   async function updateConfig(key: string, value: unknown) {
     try {
@@ -67,7 +78,7 @@ export default function OpsDashboard() {
   if (loading && Object.keys(config).length === 0) return <main className="min-h-screen bg-trust-black p-8 text-white"><div className="animate-pulse rounded-3xl bg-white/10 p-10">Loading TRUST Ops…</div></main>;
   const online = Object.keys(errors).length === 0;
   return <main className="min-h-screen bg-trust-black bg-radial-trust text-white"><div className="grid min-h-screen lg:grid-cols-[280px_1fr]">
-    <aside className="border-r border-white/10 bg-black/30 p-5"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-trust-violet shadow-glow"><Shield /></span><div><p className="font-black tracking-[.25em]">TRUST OPS</p><p className="text-xs text-zinc-400">PRODUCTION ADMIN</p></div></div><Status online={online}/><nav className="mt-8 grid gap-2">{sections.map(section => <button key={section} onClick={() => setActive(section)} className={`rounded-2xl px-4 py-3 text-left text-sm font-bold transition ${active === section ? 'bg-trust-violet shadow-glow' : 'bg-white/5 hover:bg-white/10'}`}>{section}</button>)}</nav></aside>
+    <aside className="border-r border-white/10 bg-black/30 p-5"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-trust-violet shadow-glow"><Shield /></span><div><p className="font-black tracking-[.25em]">TRUST OPS</p><p className="text-xs text-zinc-400">PRODUCTION ADMIN</p></div></div><Status online={online}/><nav className="mt-8 grid gap-2">{sections.map(section => <button key={section} onClick={() => selectSection(section)} className={`rounded-2xl px-4 py-3 text-left text-sm font-bold transition ${active === section ? 'bg-trust-violet shadow-glow' : 'bg-white/5 hover:bg-white/10'}`}>{section}</button>)}<div className="my-2 border-t border-white/10"/><Link href="/ops/balance" className="flex items-center gap-2 rounded-2xl bg-white/5 px-4 py-3 text-left text-sm font-bold transition hover:bg-white/10"><SlidersHorizontal size={17}/> Balance Studio</Link></nav></aside>
     <section className="p-5 md:p-8"><header className="mb-6 flex flex-col justify-between gap-4 rounded-3xl border border-white/10 bg-white/5 p-5 md:flex-row md:items-center"><div><p className="text-sm text-zinc-400">Server-side control plane backed by Railway PostgreSQL API</p><h1 className="text-4xl font-black">{active}</h1></div><div className="flex gap-3"><button onClick={() => void refresh()} className="rounded-2xl border border-white/10 px-4 py-3 font-bold">Retry</button><button onClick={() => void logout()} className="rounded-2xl border border-white/10 px-4 py-3" aria-label="Logout"><LogOut/></button></div></header>
     {toast && <p className="mb-4 rounded-2xl border border-trust-soft/30 bg-trust-violet/10 p-3 text-trust-soft">{toast}</p>}
     {active === 'Overview' && <><Link href="/ops/balance" className="mb-5 block rounded-3xl border border-trust-soft/30 bg-gradient-to-r from-trust-violet/30 to-transparent p-6"><p className="text-xs font-bold tracking-[.25em] text-trust-soft">GAME DEVELOPMENT TOOLS</p><h2 className="mt-2 text-2xl font-black">Balance Studio →</h2><p className="text-zinc-300">Edit TRUST custom-mode heroes, compose patches, review and publish releases.</p></Link><SectionError message={errorFor('dashboard', 'config')}/><Grid cards={[[String(data.dashboard.playersOnline ?? data.dashboard.players ?? 0), 'Players online'], [String(data.dashboard.activeQueues ?? data.queues.length), 'Active queues'], [String(data.dashboard.matches ?? data.matches.length), 'Matches'], [value('maintenance_enabled', false) ? 'On' : 'Off', 'Maintenance'], [String(value('minimum_trust_score', '—')), 'Minimum trust'], [String(value('enabled_regions', '—')), 'Enabled regions']]}/></>}

@@ -5,28 +5,42 @@ import { readFile } from 'node:fs/promises';
 const provider = await readFile('components/MatchmakingProvider.tsx', 'utf8');
 const home = await readFile('components/HomeClient.tsx', 'utf8');
 
-test('matchmaking no longer fabricates match-found with timer mock flow', () => {
+test('matchmaking is backed by server queue and match endpoints', () => {
   assert.doesNotMatch(provider, /setTimeout\(\(\) => setPhase\('found'/);
   assert.match(provider, /\/api\/backend\/queue\/join/);
-  assert.match(provider, /\/api\/backend\/queue\/status/);
-  assert.match(provider, /\/api\/backend\/matches\/\$\{matchId\}\/accept/);
+  assert.match(provider, /\/api\/backend\/queue\/cancel/);
+  assert.match(provider, /\/api\/backend\/me\/state/);
+  assert.match(provider, /\/api\/backend\/matches\/\$\{match\.id\}\/accept/);
   assert.match(provider, /\/api\/backend\/matches\/\$\{match\.id\}\/decline/);
 });
 
-test('only one role is sent and legacy secondary role is removed', () => {
-  assert.doesNotMatch(home, /Secondary role|setSecondaryRole|secondaryRole/);
-  assert.doesNotMatch(provider, /secondaryRole:\s*primaryRole/);
-  assert.match(provider, /regions, primaryRole/);
+test('players can select one to five roles without a secondary-role model', () => {
+  assert.doesNotMatch(home + provider, /Secondary role|setSecondaryRole|secondaryRole:/);
+  assert.match(provider, /selectedRoles/);
+  assert.match(provider, /roles: selectedRoles/);
+  assert.match(provider, /trust-roles/);
+  assert.match(home, /selectedRoles\.includes/);
+  assert.match(home, /toggleRole/);
 });
 
-test('Accept refetches details and preserves the original matchId', () => {
-  assert.match(provider, /const matchId = match\.id/);
-  assert.match(provider, /normalizeMatchDetails\(details, matchId\)/);
-  assert.doesNotMatch(provider, /setMatch\(data\.match \|\| data\)/);
+test('Steam authentication is required in the client before queue join', () => {
+  assert.match(provider, /steamAuthenticated !== true/);
+  assert.match(provider, /STEAM_ACCOUNT_REQUIRED/);
+  assert.match(home, /\/api\/backend\/auth\/steam\/start/);
+  assert.match(home, /steamAuthenticated !== true/);
 });
 
-test('match details players are grouped by backend team with name fallback', () => {
-  assert.match(provider, /data\.players\?\.reduce/);
-  assert.match(provider, /team === 'dire'/);
-  assert.match(provider, /p\.name \|\| p\.nickname/);
+test('each queue attempt owns a fresh timer and cancellation clears it', () => {
+  assert.match(provider, /setSearchStartedAt\(Date\.now\(\)\)/);
+  assert.match(provider, /setSearchSeconds\(0\)/);
+  assert.match(provider, /next\.queue\?\.joinedAt/);
+  assert.match(provider, /refreshVersion\.current \+= 1/);
+  assert.doesNotMatch(provider, /setSearchSeconds\(v\s*=>\s*v\s*\+\s*1\)/);
+});
+
+test('server envelopes restore active match teams and the current player', () => {
+  assert.match(provider, /state\.activeMatch/);
+  assert.match(provider, /payload\.teams/);
+  assert.match(provider, /payload\.self/);
+  assert.match(provider, /player\.primaryRole/);
 });

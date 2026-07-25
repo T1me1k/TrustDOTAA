@@ -1,0 +1,1 @@
+export default function Loading(){return <div className="animate-pulse space-y-4" aria-label="Loading"><div className="h-20 rounded-2xl bg-white/10"/><div className="grid grid-cols-3 gap-4">{[1,2,3].map(x=><div key={x} className="h-32 rounded-2xl bg-white/10"/>)}</div></div>}

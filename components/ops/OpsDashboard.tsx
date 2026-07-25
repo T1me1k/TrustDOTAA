@@ -2,9 +2,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, BarChart3, LogOut, Shield, SlidersHorizontal, ToggleLeft, Wifi, WifiOff } from 'lucide-react';
 import Link from 'next/link';
+import GameSessionsPanel from '@/components/ops/GameSessionsPanel';
 import { adaptAudit, adaptConfig, adaptDashboard, adaptFeatureFlags, adaptMatches, adaptPatches, adaptPlayers, adaptQueues, errorMessage, loadJson, type AuditEntry, type DashboardStats, type FeatureFlag, type Match, type Patch, type Player, type QueueEntry, type RuntimeConfigEntry } from '@/lib/ops-api';
 
-const sections = ['Overview', 'Matchmaking', 'Feature Flags', 'Patches', 'Players', 'Queues', 'Matches', 'Audit Log', 'Settings'];
+const sections = ['Overview', 'Matchmaking', 'Feature Flags', 'Patches', 'Players', 'Queues', 'Matches', 'Game Sessions', 'Audit Log', 'Settings'];
 type SectionData = { dashboard: DashboardStats; queues: QueueEntry[]; matches: Match[]; audit: AuditEntry[]; featureFlags: FeatureFlag[]; patches: Patch[]; players: Player[] };
 type SectionKey = keyof SectionData | 'config';
 const initialData: SectionData = { dashboard: {}, queues: [], matches: [], audit: [], featureFlags: [], patches: [], players: [] };
@@ -88,6 +89,7 @@ export default function OpsDashboard() {
     {active === 'Players' && <><SectionError message={errorFor('players')}/><Table rows={data.players.map(player => [player.personaName ?? player.displayName ?? '—', player.steamId ?? player.id ?? '—', String(player.trustScore ?? '—'), player.status ?? '—'])}/></>}
     {active === 'Queues' && <><SectionError message={errorFor('queues')}/><Table rows={data.queues.map(queue => [queue.id ?? '—', queue.region ?? '—', queue.status ?? '—', String(queue.players ?? '—')])}/></>}
     {active === 'Matches' && <><SectionError message={errorFor('matches')}/><Table rows={data.matches.map(match => [match.id ?? match.matchId ?? '—', match.status ?? '—', match.region ?? '—', String(match.playersAccepted ?? match.acceptedPlayers ?? '—')])} actionLabel="Cancel" action={index => void cancelMatch(data.matches[index].id ?? data.matches[index].matchId ?? '')}/></>}
+    {active === 'Game Sessions' && <GameSessionsPanel/>}
     {active === 'Audit Log' && <><SectionError message={errorFor('audit')}/><Table rows={data.audit.map(entry => [entry.createdAt ?? entry.time ?? '—', entry.actor ?? entry.admin ?? '—', entry.action ?? '—', entry.entity ?? '—', entry.result ?? '—'])}/></>}
     {active === 'Settings' && <Panel><p>Configuration is loaded as validated key/value entries. Admin credentials remain server-side.</p></Panel>}
     </section></div></main>;

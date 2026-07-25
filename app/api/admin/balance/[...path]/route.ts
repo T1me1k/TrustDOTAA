@@ -4,7 +4,7 @@ import { backendBaseUrl } from '@/lib/backend-proxy';
 import { IMPORT_LIMIT } from '@/lib/balance-validation';
 
 const SAFE_SEGMENT=/^[A-Za-z0-9_-]+$/;
-export function safeBalancePath(parts:string[]){return parts.length>0&&parts.every(part=>part.length>0&&SAFE_SEGMENT.test(part)&&part!=='.'&&part!=='..');}
+function safeBalancePath(parts:string[]){return parts.length>0&&parts.every(part=>part.length>0&&SAFE_SEGMENT.test(part)&&part!=='.'&&part!=='..');}
 function sameOrigin(req:NextRequest){const origin=req.headers.get('origin');if(!origin)return true;const expected=new URL(req.url).origin;if(origin===expected)return true;const forwardedHost=req.headers.get('x-forwarded-host');const forwardedProto=req.headers.get('x-forwarded-proto')||'https';return Boolean(forwardedHost&&origin===`${forwardedProto}://${forwardedHost}`);}
 function error(status:number,error:string,requestId:string){return NextResponse.json({error,requestId},{status,headers:{'cache-control':'no-store'}})}
 async function handle(req:NextRequest,ctx:{params:{path:string[]}}){

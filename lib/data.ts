@@ -36,7 +36,7 @@ export const matches = [
 export const leaderboard = [
   { place: 1, name: 'AegisRush', rating: 3120, region: 'EU West', winRate: '68%', trustScore: 98 },
   { place: 2, name: 'VoidLegacy', rating: 2847, region: 'EU East', winRate: '61%', trustScore: 96 },
-  { place: 3, name: 'LotusMind', rating: 2791, region: 'NA', winRate: '63%', trustScore: 94 },
+  { place: 3, name: 'LotusMind', rating: 2791, region: 'US East', winRate: '63%', trustScore: 94 },
   { place: 4, name: 'GlyphEdge', rating: 2710, region: 'SEA', winRate: '58%', trustScore: 91 },
   { place: 5, name: 'SmokeCore', rating: 2685, region: 'EU West', winRate: '57%', trustScore: 93 },
 ];

@@ -6,7 +6,7 @@ export const stats = [
 ];
 
 export const roles = ['Carry', 'Mid', 'Offlane', 'Soft Support', 'Hard Support'];
-export const regions = ['EU West', 'EU East', 'NA', 'SEA'];
+export const regions = ['EU West', 'EU East', 'US East', 'US West', 'SEA'];
 
 export const player = {
   name: 'VoidLegacy',

@@ -58,3 +58,8 @@ test('live status, roster, events, and safe payload adapters are present', () =>
     assert.match(adapters, new RegExp(`function ${adapter}|const ${adapter}`));
   }
 });
+
+test('cancelled and completed matches are excluded from playable session issuance', () => {
+  assert.match(panel, /filter\(match => activeMatchStates\.has\(match\.status/);
+  assert.match(panel, /new Set\(\['ready', 'connecting', 'in_progress'\]\)/);
+});

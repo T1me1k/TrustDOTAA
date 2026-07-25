@@ -1,0 +1,9 @@
+'use client';
+import { useEffect } from 'react';
+export function Header({title,description,actions}:{title:string;description:string;actions?:React.ReactNode}){return <header className="sticky top-0 z-20 mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-trust-black/90 py-4 backdrop-blur"><div><h1 className="text-2xl font-black md:text-4xl">{title}</h1><p className="text-sm text-zinc-400">{description}</p></div><div className="flex flex-wrap gap-2">{actions}</div></header>}
+export function Card({children,className=''}:{children:React.ReactNode;className?:string}){return <section className={`rounded-2xl border border-white/10 bg-white/[.045] p-4 ${className}`}>{children}</section>}
+export function Button(props:React.ButtonHTMLAttributes<HTMLButtonElement>){return <button {...props} className={`rounded-xl bg-trust-violet px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-trust-soft disabled:opacity-50 ${props.className||''}`}/>}
+export function Empty({children}:{children:React.ReactNode}){return <div className="rounded-2xl border border-dashed border-white/15 p-10 text-center text-zinc-400">{children}</div>}
+export function ErrorBox({error,retry}:{error:string;retry?:()=>void}){return <div role="alert" className="rounded-2xl border border-rose-400/30 bg-rose-950/50 p-4"><b>{error}</b>{retry&&<button className="ml-3 underline" onClick={retry}>Retry</button>}</div>}
+export function DirtyGuard({dirty}:{dirty:boolean}){useEffect(()=>{const fn=(e:BeforeUnloadEvent)=>{if(dirty)e.preventDefault()};addEventListener('beforeunload',fn);return()=>removeEventListener('beforeunload',fn)},[dirty]);return null}
+export function Status({state}:{state:'saved'|'saving'|'unsaved'|'error'}){return <span role="status" className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-xs">● {state[0].toUpperCase()+state.slice(1)}</span>}

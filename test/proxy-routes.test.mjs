@@ -19,10 +19,11 @@ test('cookie forwarding uses same-origin credentials and Set-Cookie forwarding',
   assert.match(provider, /credentials: 'include'/);
 });
 
-test('guest auth proxies to v1 production backend through BFF', () => {
+test('guest auth route stays server-side but matchmaking does not auto-create guest sessions', () => {
   assert.match(guest, /proxyToBackend/);
   assert.match(guest, /\/v1\/auth\/guest/);
-  assert.match(provider, /\/api\/backend\/auth\/guest/);
+  assert.doesNotMatch(provider, /\/api\/backend\/auth\/guest/);
+  assert.match(provider, /STEAM_ACCOUNT_REQUIRED/);
 });
 
 test('queue join cancel and status proxy to v1 backend', () => {

@@ -30,7 +30,7 @@ export interface MatchDetails {
   cancellationReason?: string; cancellationCode?: string; requeued?: boolean;
   currentPlayerId?: string; timeline?: Array<{ status: MatchStatus; at: string; reason?: string }>;
 }
-export interface MeState { status: MatchStatus; match?: MatchDetails | null; queue?: { regions: string[]; role: string; joinedAt?: string } }
+export interface MeState { status: MatchStatus; match?: MatchDetails | null; player?: { steamId64?: string | null }; queue?: { regions: string[]; roles: string[]; primaryRole?: string; joinedAt?: string; status?: string } }
 export interface MatchHistoryEntry extends MatchDetails { userTeam?: TeamSide; result?: 'victory' | 'defeat' | 'cancelled'; ratingDelta?: number; trustScoreDelta?: number }
 export interface AdminDashboardStats { onlinePlayers: number; queuedPlayers: number; activeMatches: number; completedToday: number; cancelledToday: number; averageQueueSeconds: number; acceptanceRate: number; timeoutRate: number; ratingEvents: number; trustEvents: number }
 export interface AdminTimeSeries { from: string; to: string; points: Array<{ at: string; matches: number; completed: number; cancelled: number; acceptanceRate: number }>; regions: Array<{ region: string; matches: number }> }

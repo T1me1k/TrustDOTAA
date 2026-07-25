@@ -44,3 +44,12 @@ test('server envelopes restore active match teams and the current player', () =>
   assert.match(provider, /payload\.self/);
   assert.match(provider, /player\.primaryRole/);
 });
+
+test('legacy regions are migrated to the backend canonical contract before queue join', async () => {
+  const data = await readFile('lib/data.ts', 'utf8');
+  const runtime = await readFile('lib/runtime-config.ts', 'utf8');
+  assert.doesNotMatch(data, /['"]NA['"]/);
+  assert.doesNotMatch(runtime, /name:'NA'|id:'na'/);
+  assert.match(provider, /item === 'NA' \? 'US East'/);
+  assert.match(provider, /regions: queueRegions, roles: queueRoles/);
+});

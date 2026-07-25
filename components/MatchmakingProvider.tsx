@@ -183,14 +183,14 @@ export function MatchmakingProvider({ children }: { children: React.ReactNode })
     const enabledRoles = new Set(config.roles.filter((item) => item.enabled).map((item) => item.name));
     setRegions((current) => {
       const migrated = current.map((item) => item === 'NA' ? 'US East' : item);
-      const filtered = [...new Set(migrated.filter((item) => enabledRegions.has(item)))].slice(0, 3);
+      const filtered = Array.from(new Set(migrated.filter((item) => enabledRegions.has(item)))).slice(0, 3);
       const next = filtered.length ? filtered : [config.regions.find((item) => item.enabled)?.name ?? 'EU West'];
       if (next.length === current.length && next.every((item, index) => item === current[index])) return current;
       localStorage.setItem('trust-regions', JSON.stringify(next));
       return next;
     });
     setSelectedRoles((current) => {
-      const filtered = [...new Set(current.filter((item) => enabledRoles.has(item)))].slice(0, 5);
+      const filtered = Array.from(new Set(current.filter((item) => enabledRoles.has(item)))).slice(0, 5);
       const next = filtered.length ? filtered : [config.roles.find((item) => item.enabled)?.name ?? 'Mid'];
       if (next.length === current.length && next.every((item, index) => item === current[index])) return current;
       localStorage.setItem('trust-roles', JSON.stringify(next));
@@ -324,8 +324,8 @@ export function MatchmakingProvider({ children }: { children: React.ReactNode })
     }
     const enabledRegions = config?.regions.filter((item) => item.enabled).map((item) => item.name) ?? ['EU West', 'EU East', 'US East', 'US West', 'SEA'];
     const enabledRoles = config?.roles.filter((item) => item.enabled).map((item) => item.name) ?? ['Carry', 'Mid', 'Offlane', 'Soft Support', 'Hard Support'];
-    const queueRegions = [...new Set(regions.map((item) => item === 'NA' ? 'US East' : item).filter((item) => enabledRegions.includes(item)))].slice(0, 3);
-    const queueRoles = [...new Set(selectedRoles.filter((item) => enabledRoles.includes(item)))].slice(0, 5);
+    const queueRegions = Array.from(new Set(regions.map((item) => item === 'NA' ? 'US East' : item).filter((item) => enabledRegions.includes(item)))).slice(0, 3);
+    const queueRoles = Array.from(new Set(selectedRoles.filter((item) => enabledRoles.includes(item)))).slice(0, 5);
     if (!queueRoles.length || !queueRegions.length) {
       setError('QUEUE_SELECTION_REQUIRED');
       setPhase('error');

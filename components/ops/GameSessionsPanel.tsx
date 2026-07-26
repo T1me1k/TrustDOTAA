@@ -275,7 +275,7 @@ export default function GameSessionsPanel() {
   const allSessions = useMemo(() => {
     const byId = new Map<string, GameSession>();
     for (const item of [...diagnosticSessions, ...sessions]) byId.set(item.id, item);
-    return [...byId.values()];
+    return Array.from(byId.values());
   }, [diagnosticSessions, sessions]);
   const launchPacket = useMemo(() => {
     if (!issuedSecret || !backendInfo || issuedSecret.sessionId !== session?.id) return '';

@@ -6,6 +6,7 @@ const dashboard = await readFile('components/ops/OpsDashboard.tsx', 'utf8');
 const panel = await readFile('components/ops/GameSessionsPanel.tsx', 'utf8');
 const adapters = await readFile('lib/ops-api.ts', 'utf8');
 const matchSession = await readFile('app/api/admin/matches/[matchId]/game-session/route.ts', 'utf8');
+const diagnosticSession = await readFile('app/api/admin/game-sessions/diagnostic/route.ts', 'utf8');
 const session = await readFile('app/api/admin/game-sessions/[sessionId]/route.ts', 'utf8');
 const confirm = await readFile('app/api/admin/game-sessions/[sessionId]/confirm-result/route.ts', 'utf8');
 const revoke = await readFile('app/api/admin/game-sessions/[sessionId]/revoke/route.ts', 'utf8');
@@ -18,7 +19,7 @@ test('game sessions are integrated into the existing TRUST Ops navigation', () =
 });
 
 test('server-side routes enforce the ops session and backend admin authentication', () => {
-  for (const route of [matchSession, session, confirm, revoke]) {
+  for (const route of [matchSession, diagnosticSession, session, confirm, revoke]) {
     assert.match(route, /assertAdmin\(\)/);
     assert.match(route, /admin: true/);
     assert.match(route, /proxyToBackend/);
@@ -62,4 +63,13 @@ test('live status, roster, events, and safe payload adapters are present', () =>
 test('cancelled and completed matches are excluded from playable session issuance', () => {
   assert.match(panel, /filter\(match => activeMatchStates\.has\(match\.status/);
   assert.match(panel, /new Set\(\['ready', 'connecting', 'in_progress'\]\)/);
+});
+
+
+test('safe one-player diagnostics are visibly separated from rated matches', () => {
+  assert.match(diagnosticSession, /game-sessions\/diagnostic/);
+  assert.match(panel, /One-player Railway session/);
+  assert.match(panel, /DIAGNOSTIC_GAME_SESSIONS_ENABLED/);
+  assert.match(panel, /results and rating changes are blocked/i);
+  assert.match(panel, /development_diagnostic/);
 });

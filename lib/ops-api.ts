@@ -73,7 +73,7 @@ export type GameSessionResult = {
 };
 export type GameSession = {
   id: string;
-  matchId: string;
+  matchId?: string;
   status: GameSessionStatus;
   verificationMode: string;
   balancePatchVersion?: string;
@@ -245,7 +245,7 @@ export function adaptGameSession(payload: unknown): GameSession | null {
   const id = text(value.id);
   const matchId = text(value.matchId);
   const status = text(value.status);
-  if (!id || !matchId || !status || !['issued', 'active', 'result_pending', 'completed', 'expired', 'revoked'].includes(status)) return null;
+  if (!id || !status || !['issued', 'active', 'result_pending', 'completed', 'expired', 'revoked'].includes(status)) return null;
   return {
     id,
     matchId,

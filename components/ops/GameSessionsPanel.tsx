@@ -41,6 +41,9 @@ export default function GameSessionsPanel() {
   const [selectedMatchId, setSelectedMatchId] = useState('');
   const [matchDetails, setMatchDetails] = useState<MatchDetails | null>(null);
   const [sessions, setSessions] = useState<GameSession[]>([]);
+  const [diagnosticSessions, setDiagnosticSessions] = useState<GameSession[]>([]);
+  const [diagnosticSteamId64, setDiagnosticSteamId64] = useState('');
+  const [diagnosticPersonaName, setDiagnosticPersonaName] = useState('');
   const [selectedSessionId, setSelectedSessionId] = useState('');
   const [session, setSession] = useState<GameSession | null>(null);
   const [events, setEvents] = useState<GameSessionEvent[]>([]);
@@ -70,11 +73,7 @@ export default function GameSessionsPanel() {
     setMatchDetails(adaptMatchDetails(detailsPayload));
     const nextSessions = adaptGameSessions(sessionsPayload);
     setSessions(nextSessions);
-    setSelectedSessionId(current => (
-      current && nextSessions.some(item => item.id === current)
-        ? current
-        : nextSessions[0]?.id ?? ''
-    ));
+    setSelectedSessionId(current => current || nextSessions[0]?.id || '');
     setLastRefresh(new Date());
   }, []);
 
@@ -86,16 +85,21 @@ export default function GameSessionsPanel() {
     setLastRefresh(new Date());
   }, []);
 
+  const loadDiagnosticSessions = useCallback(async () => {
+    const payload = await loadJson('/api/admin/game-sessions/diagnostic');
+    setDiagnosticSessions(adaptGameSessions(payload));
+  }, []);
+
   const refresh = useCallback(async () => {
     setError('');
     try {
-      await loadMatches();
+      await Promise.all([loadMatches(), loadDiagnosticSessions()]);
       if (selectedMatchId) await loadMatch(selectedMatchId);
       if (selectedSessionId) await loadSession(selectedSessionId);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Unable to load game sessions');
     }
-  }, [loadMatch, loadMatches, loadSession, selectedMatchId, selectedSessionId]);
+  }, [loadDiagnosticSessions, loadMatch, loadMatches, loadSession, selectedMatchId, selectedSessionId]);
 
   useEffect(() => {
     void (async () => {
@@ -104,12 +108,12 @@ export default function GameSessionsPanel() {
         if (isRecord(payload) && typeof payload.apiBaseUrl === 'string' && typeof payload.addonId === 'string') {
           setBackendInfo({ apiBaseUrl: payload.apiBaseUrl, addonId: payload.addonId });
         }
-        await loadMatches();
+        await Promise.all([loadMatches(), loadDiagnosticSessions()]);
       } catch (nextError) {
         setError(nextError instanceof Error ? nextError.message : 'Unable to load game sessions');
       }
     })();
-  }, [loadMatches]);
+  }, [loadDiagnosticSessions, loadMatches]);
 
   useEffect(() => {
     if (!selectedMatchId) {
@@ -136,13 +140,50 @@ export default function GameSessionsPanel() {
   }, [loadSession, selectedSessionId]);
 
   useEffect(() => {
-    if (!selectedMatchId) return undefined;
     const timer = window.setInterval(() => {
-      void loadMatch(selectedMatchId).catch(() => undefined);
+      void loadDiagnosticSessions().catch(() => undefined);
+      if (selectedMatchId) void loadMatch(selectedMatchId).catch(() => undefined);
       if (selectedSessionId) void loadSession(selectedSessionId).catch(() => undefined);
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [loadMatch, loadSession, selectedMatchId, selectedSessionId]);
+  }, [loadDiagnosticSessions, loadMatch, loadSession, selectedMatchId, selectedSessionId]);
+
+  async function issueDiagnosticSession() {
+    setBusy('diagnostic');
+    setError('');
+    setNotice('');
+    try {
+      const payload = await loadJson('/api/admin/game-sessions/diagnostic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          steamId64: diagnosticSteamId64.trim(),
+          personaName: diagnosticPersonaName.trim() || 'Diagnostic player',
+          ttlSeconds: 900,
+        }),
+      });
+      const next = adaptGameSession(payload);
+      if (!next || !isRecord(payload) || typeof payload.token !== 'string') {
+        throw new Error('Backend did not return the one-time diagnostic token');
+      }
+      setIssuedSecret({
+        sessionId: next.id,
+        token: payload.token,
+        bootstrapPath: typeof payload.bootstrapPath === 'string'
+          ? payload.bootstrapPath
+          : '/v1/game-sessions/bootstrap',
+      });
+      setSession(next);
+      setEvents([]);
+      setSelectedSessionId(next.id);
+      setDiagnosticSessions(current => [next, ...current.filter(item => item.id !== next.id)]);
+      setNotice('Diagnostic session issued. It accepts heartbeat and events only; results and rating changes are blocked by the backend.');
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Unable to issue diagnostic session');
+    } finally {
+      setBusy('');
+    }
+  }
 
   async function issueSession() {
     if (!selectedMatchId) return;
@@ -231,6 +272,11 @@ export default function GameSessionsPanel() {
 
   const selectedMatch = matchDetails?.match ?? matches.find(match => match.id === selectedMatchId) ?? null;
   const canIssue = Boolean(selectedMatch && activeMatchStates.has(selectedMatch.status ?? ''));
+  const allSessions = useMemo(() => {
+    const byId = new Map<string, GameSession>();
+    for (const item of [...diagnosticSessions, ...sessions]) byId.set(item.id, item);
+    return [...byId.values()];
+  }, [diagnosticSessions, sessions]);
   const launchPacket = useMemo(() => {
     if (!issuedSecret || !backendInfo || issuedSecret.sessionId !== session?.id) return '';
     return JSON.stringify({
@@ -267,6 +313,43 @@ export default function GameSessionsPanel() {
 
     {error && <Notice tone="error">{error}</Notice>}
     {notice && <Notice tone="success">{notice}</Notice>}
+
+    <section className="rounded-3xl border border-cyan-300/20 bg-cyan-500/5 p-5">
+      <div className="flex items-start gap-3">
+        <ShieldCheck className="mt-1 shrink-0 text-cyan-300"/>
+        <div>
+          <p className="text-xs font-bold tracking-[.2em] text-cyan-200">SAFE LOCAL DIAGNOSTIC</p>
+          <h3 className="mt-1 text-2xl font-black">One-player Railway session</h3>
+          <p className="mt-2 max-w-3xl text-sm text-zinc-300">
+            Use this only to verify addon bootstrap, heartbeat, roster visibility, and events. The backend rejects result submission and confirmation, so Rating and Trust Score cannot change.
+          </p>
+        </div>
+      </div>
+      <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
+        <input
+          value={diagnosticSteamId64}
+          onChange={event => setDiagnosticSteamId64(event.target.value.replace(/\D/g, '').slice(0, 17))}
+          placeholder="Steam ID64 (17 digits)"
+          inputMode="numeric"
+          className="rounded-2xl border border-white/10 bg-black/40 p-3 text-sm"
+        />
+        <input
+          value={diagnosticPersonaName}
+          onChange={event => setDiagnosticPersonaName(event.target.value)}
+          placeholder="Display name (optional)"
+          maxLength={100}
+          className="rounded-2xl border border-white/10 bg-black/40 p-3 text-sm"
+        />
+        <button
+          disabled={!/^7656119\d{10}$/.test(diagnosticSteamId64) || busy === 'diagnostic'}
+          onClick={() => void issueDiagnosticSession()}
+          className="rounded-2xl bg-cyan-300 px-6 py-3 font-black text-cyan-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {busy === 'diagnostic' ? 'Issuing…' : 'Issue diagnostic token'}
+        </button>
+      </div>
+      <p className="mt-3 text-xs text-zinc-500">Requires DIAGNOSTIC_GAME_SESSIONS_ENABLED=true on the Railway backend service.</p>
+    </section>
 
     <section className="grid gap-5 xl:grid-cols-[.9fr_1.1fr]">
       <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
@@ -327,7 +410,7 @@ export default function GameSessionsPanel() {
         <div><p className="text-xs font-bold tracking-[.2em] text-zinc-500">SESSION HISTORY</p><h3 className="text-2xl font-black">Server status</h3></div>
         <select value={selectedSessionId} onChange={event => setSelectedSessionId(event.target.value)} className="rounded-2xl border border-white/10 bg-zinc-950 p-3 text-sm">
           <option value="">No session selected</option>
-          {sessions.map(item => <option key={item.id} value={item.id}>{item.status} · {shortId(item.id)} · {formatTime(item.createdAt)}</option>)}
+          {allSessions.map(item => <option key={item.id} value={item.id}>{item.verificationMode === 'development_diagnostic' ? 'diagnostic' : item.status} · {shortId(item.id)} · {formatTime(item.createdAt)}</option>)}
         </select>
       </div>
       {session ? <div className="mt-5 grid gap-5">
@@ -379,7 +462,7 @@ function TeamRoster({ session, fallback }: { session: GameSession; fallback: Mat
     rating: player.ratingBefore,
   }));
   return <section className="rounded-3xl border border-white/10 bg-white/5 p-5">
-    <div className="flex items-center gap-3"><Users className="text-trust-soft"/><h3 className="text-2xl font-black">Pinned roster</h3><span className="text-sm text-zinc-500">{roster.length}/10</span></div>
+    <div className="flex items-center gap-3"><Users className="text-trust-soft"/><h3 className="text-2xl font-black">Pinned roster</h3><span className="text-sm text-zinc-500">{roster.length}/{session.verificationMode === 'development_diagnostic' ? 1 : 10}</span></div>
     <div className="mt-5 grid gap-5 lg:grid-cols-2">
       {(['radiant', 'dire'] as const).map(team => <div key={team}>
         <p className={`mb-3 text-sm font-black uppercase tracking-[.2em] ${team === 'radiant' ? 'text-emerald-300' : 'text-rose-300'}`}>{team}</p>

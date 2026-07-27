@@ -13,7 +13,7 @@ function backendBaseUrl() {
   return (process.env.BACKEND_API_URL || DEFAULT_BACKEND).replace(/\/$/, '');
 }
 
-export function allowedGamePath(segments: string[]) {
+function allowedGamePath(segments: string[]) {
   const path = `/${segments.join('/')}`;
   if (path === '/ready' || path === '/v1/game-sessions/bootstrap') return path;
   return SESSION_ACTION.test(path) ? path : null;

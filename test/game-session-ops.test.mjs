@@ -7,6 +7,7 @@ const panel = await readFile('components/ops/GameSessionsPanel.tsx', 'utf8');
 const adapters = await readFile('lib/ops-api.ts', 'utf8');
 const matchSession = await readFile('app/api/admin/matches/[matchId]/game-session/route.ts', 'utf8');
 const diagnosticSession = await readFile('app/api/admin/game-sessions/diagnostic/route.ts', 'utf8');
+const stagingSession = await readFile('app/api/admin/game-sessions/staging/route.ts', 'utf8');
 const session = await readFile('app/api/admin/game-sessions/[sessionId]/route.ts', 'utf8');
 const confirm = await readFile('app/api/admin/game-sessions/[sessionId]/confirm-result/route.ts', 'utf8');
 const revoke = await readFile('app/api/admin/game-sessions/[sessionId]/revoke/route.ts', 'utf8');
@@ -19,7 +20,7 @@ test('game sessions are integrated into the existing TRUST Ops navigation', () =
 });
 
 test('server-side routes enforce the ops session and backend admin authentication', () => {
-  for (const route of [matchSession, diagnosticSession, session, confirm, revoke]) {
+  for (const route of [matchSession, diagnosticSession, stagingSession, session, confirm, revoke]) {
     assert.match(route, /assertAdmin\(\)/);
     assert.match(route, /admin: true/);
     assert.match(route, /proxyToBackend/);
@@ -72,4 +73,15 @@ test('safe one-player diagnostics are visibly separated from rated matches', () 
   assert.match(panel, /DIAGNOSTIC_GAME_SESSIONS_ENABLED/);
   assert.match(panel, /results and rating changes are blocked/i);
   assert.match(panel, /development_diagnostic/);
+});
+
+test('safe staging matches support 1-10 real players without rating authority', () => {
+  assert.match(stagingSession, /game-sessions\/staging/);
+  assert.match(panel, /SAFE STAGING MATCH/);
+  assert.match(panel, /STAGING_GAME_SESSIONS_ENABLED/);
+  assert.match(panel, /parseStagingRoster/);
+  assert.match(panel, /1 and 10 staging players/);
+  assert.match(panel, /development_staging/);
+  assert.match(panel, /STAGING RESULT · NO RATING/);
+  assert.match(panel, /Rating, Trust Score, match history, and result confirmation remain disabled/);
 });

@@ -42,6 +42,8 @@ export default function GameSessionsPanel() {
   const [matchDetails, setMatchDetails] = useState<MatchDetails | null>(null);
   const [sessions, setSessions] = useState<GameSession[]>([]);
   const [diagnosticSessions, setDiagnosticSessions] = useState<GameSession[]>([]);
+  const [stagingSessions, setStagingSessions] = useState<GameSession[]>([]);
+  const [stagingRosterText, setStagingRosterText] = useState('');
   const [diagnosticSteamId64, setDiagnosticSteamId64] = useState('');
   const [diagnosticPersonaName, setDiagnosticPersonaName] = useState('');
   const [selectedSessionId, setSelectedSessionId] = useState('');
@@ -90,16 +92,21 @@ export default function GameSessionsPanel() {
     setDiagnosticSessions(adaptGameSessions(payload));
   }, []);
 
+  const loadStagingSessions = useCallback(async () => {
+    const payload = await loadJson('/api/admin/game-sessions/staging');
+    setStagingSessions(adaptGameSessions(payload));
+  }, []);
+
   const refresh = useCallback(async () => {
     setError('');
     try {
-      await Promise.all([loadMatches(), loadDiagnosticSessions()]);
+      await Promise.all([loadMatches(), loadDiagnosticSessions(), loadStagingSessions()]);
       if (selectedMatchId) await loadMatch(selectedMatchId);
       if (selectedSessionId) await loadSession(selectedSessionId);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Unable to load game sessions');
     }
-  }, [loadDiagnosticSessions, loadMatch, loadMatches, loadSession, selectedMatchId, selectedSessionId]);
+  }, [loadDiagnosticSessions, loadMatch, loadMatches, loadSession, loadStagingSessions, selectedMatchId, selectedSessionId]);
 
   useEffect(() => {
     void (async () => {
@@ -108,12 +115,12 @@ export default function GameSessionsPanel() {
         if (isRecord(payload) && typeof payload.apiBaseUrl === 'string' && typeof payload.addonId === 'string') {
           setBackendInfo({ apiBaseUrl: payload.apiBaseUrl, addonId: payload.addonId });
         }
-        await Promise.all([loadMatches(), loadDiagnosticSessions()]);
+        await Promise.all([loadMatches(), loadDiagnosticSessions(), loadStagingSessions()]);
       } catch (nextError) {
         setError(nextError instanceof Error ? nextError.message : 'Unable to load game sessions');
       }
     })();
-  }, [loadDiagnosticSessions, loadMatches]);
+  }, [loadDiagnosticSessions, loadMatches, loadStagingSessions]);
 
   useEffect(() => {
     if (!selectedMatchId) {
@@ -142,11 +149,46 @@ export default function GameSessionsPanel() {
   useEffect(() => {
     const timer = window.setInterval(() => {
       void loadDiagnosticSessions().catch(() => undefined);
+      void loadStagingSessions().catch(() => undefined);
       if (selectedMatchId) void loadMatch(selectedMatchId).catch(() => undefined);
       if (selectedSessionId) void loadSession(selectedSessionId).catch(() => undefined);
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [loadDiagnosticSessions, loadMatch, loadSession, selectedMatchId, selectedSessionId]);
+  }, [loadDiagnosticSessions, loadMatch, loadSession, loadStagingSessions, selectedMatchId, selectedSessionId]);
+
+  async function issueStagingSession() {
+    setBusy('staging');
+    setError('');
+    setNotice('');
+    try {
+      const players = parseStagingRoster(stagingRosterText);
+      const payload = await loadJson('/api/admin/game-sessions/staging', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ players, ttlSeconds: 900 }),
+      });
+      const next = adaptGameSession(payload);
+      if (!next || !isRecord(payload) || typeof payload.token !== 'string') {
+        throw new Error('Backend did not return the one-time staging token');
+      }
+      setIssuedSecret({
+        sessionId: next.id,
+        token: payload.token,
+        bootstrapPath: typeof payload.bootstrapPath === 'string'
+          ? payload.bootstrapPath
+          : '/v1/game-sessions/bootstrap',
+      });
+      setSession(next);
+      setEvents([]);
+      setSelectedSessionId(next.id);
+      setStagingSessions(current => [next, ...current.filter(item => item.id !== next.id)]);
+      setNotice('Staging session issued. It records the full game lifecycle and result but can never update Rating or Trust Score.');
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Unable to issue staging session');
+    } finally {
+      setBusy('');
+    }
+  }
 
   async function issueDiagnosticSession() {
     setBusy('diagnostic');
@@ -274,9 +316,9 @@ export default function GameSessionsPanel() {
   const canIssue = Boolean(selectedMatch && activeMatchStates.has(selectedMatch.status ?? ''));
   const allSessions = useMemo(() => {
     const byId = new Map<string, GameSession>();
-    for (const item of [...diagnosticSessions, ...sessions]) byId.set(item.id, item);
+    for (const item of [...stagingSessions, ...diagnosticSessions, ...sessions]) byId.set(item.id, item);
     return Array.from(byId.values());
-  }, [diagnosticSessions, sessions]);
+  }, [diagnosticSessions, sessions, stagingSessions]);
   const launchPacket = useMemo(() => {
     if (!issuedSecret || !backendInfo || issuedSecret.sessionId !== session?.id) return '';
     return JSON.stringify({
@@ -351,6 +393,41 @@ export default function GameSessionsPanel() {
       <p className="mt-3 text-xs text-zinc-500">Requires DIAGNOSTIC_GAME_SESSIONS_ENABLED=true on the Railway backend service.</p>
     </section>
 
+    <section className="rounded-3xl border border-emerald-300/20 bg-emerald-500/5 p-5">
+      <div className="flex items-start gap-3">
+        <Users className="mt-1 shrink-0 text-emerald-300"/>
+        <div>
+          <p className="text-xs font-bold tracking-[.2em] text-emerald-200">SAFE STAGING MATCH</p>
+          <h3 className="mt-1 text-2xl font-black">Real players, bots, full lifecycle</h3>
+          <p className="mt-2 max-w-3xl text-sm text-zinc-300">
+            Verify 1–10 real Steam players, observe connects and disconnects, and store the final winner and score. Bots are ignored by roster verification. Rating, Trust Score, match history, and result confirmation remain disabled.
+          </p>
+        </div>
+      </div>
+      <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_auto]">
+        <label className="grid gap-2 text-sm font-bold text-zinc-300">
+          Roster — one player per line
+          <textarea
+            value={stagingRosterText}
+            onChange={event => setStagingRosterText(event.target.value)}
+            rows={6}
+            placeholder={'7656119XXXXXXXXXX | Player name | radiant | Mid\n7656119XXXXXXXXXX | Player two | dire | Carry'}
+            className="rounded-2xl border border-white/10 bg-black/40 p-4 font-mono text-sm font-normal"
+          />
+        </label>
+        <button
+          disabled={!stagingRosterText.trim() || busy === 'staging'}
+          onClick={() => void issueStagingSession()}
+          className="self-end rounded-2xl bg-emerald-300 px-6 py-4 font-black text-emerald-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {busy === 'staging' ? 'Issuing…' : 'Issue staging token'}
+        </button>
+      </div>
+      <p className="mt-3 text-xs text-zinc-500">
+        Format: Steam ID64 | display name | radiant/dire | role. Team and role are optional. Maximum five real players per team. Requires STAGING_GAME_SESSIONS_ENABLED=true on Railway.
+      </p>
+    </section>
+
     <section className="grid gap-5 xl:grid-cols-[.9fr_1.1fr]">
       <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
         <label className="grid gap-2 text-sm font-bold text-zinc-300">
@@ -410,7 +487,7 @@ export default function GameSessionsPanel() {
         <div><p className="text-xs font-bold tracking-[.2em] text-zinc-500">SESSION HISTORY</p><h3 className="text-2xl font-black">Server status</h3></div>
         <select value={selectedSessionId} onChange={event => setSelectedSessionId(event.target.value)} className="rounded-2xl border border-white/10 bg-zinc-950 p-3 text-sm">
           <option value="">No session selected</option>
-          {allSessions.map(item => <option key={item.id} value={item.id}>{item.verificationMode === 'development_diagnostic' ? 'diagnostic' : item.status} · {shortId(item.id)} · {formatTime(item.createdAt)}</option>)}
+          {allSessions.map(item => <option key={item.id} value={item.id}>{sessionMode(item)} · {item.status} · {shortId(item.id)} · {formatTime(item.createdAt)}</option>)}
         </select>
       </div>
       {session ? <div className="mt-5 grid gap-5">
@@ -422,7 +499,13 @@ export default function GameSessionsPanel() {
           <Detail label="Expires" value={formatTime(session.expiresAt)}/>
         </div>
 
-        {session.status === 'result_pending' && session.result && <div className="rounded-3xl border border-amber-300/25 bg-amber-500/10 p-5">
+        {session.verificationMode === 'development_staging' && session.status === 'completed' && session.result && <div className="rounded-3xl border border-emerald-300/25 bg-emerald-500/10 p-5">
+          <p className="text-xs font-bold tracking-[.2em] text-emerald-200">STAGING RESULT · NO RATING</p>
+          <h4 className="mt-1 text-2xl font-black">{title(session.result.winner)} victory · {session.result.radiantScore}:{session.result.direScore}</h4>
+          <p className="text-sm text-zinc-300">Duration {duration(session.result.durationSeconds)} · stored for diagnostics only</p>
+        </div>}
+
+        {session.verificationMode === 'unverified_valve_hosted' && session.status === 'result_pending' && session.result && <div className="rounded-3xl border border-amber-300/25 bg-amber-500/10 p-5">
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
             <div>
               <p className="text-xs font-bold tracking-[.2em] text-amber-200">ADMIN REVIEW REQUIRED</p>
@@ -462,7 +545,7 @@ function TeamRoster({ session, fallback }: { session: GameSession; fallback: Mat
     rating: player.ratingBefore,
   }));
   return <section className="rounded-3xl border border-white/10 bg-white/5 p-5">
-    <div className="flex items-center gap-3"><Users className="text-trust-soft"/><h3 className="text-2xl font-black">Pinned roster</h3><span className="text-sm text-zinc-500">{roster.length}/{session.verificationMode === 'development_diagnostic' ? 1 : 10}</span></div>
+    <div className="flex items-center gap-3"><Users className="text-trust-soft"/><h3 className="text-2xl font-black">Pinned roster</h3><span className="text-sm text-zinc-500">{roster.length}/{session.verificationMode === 'unverified_valve_hosted' ? 10 : roster.length}</span></div>
     <div className="mt-5 grid gap-5 lg:grid-cols-2">
       {(['radiant', 'dire'] as const).map(team => <div key={team}>
         <p className={`mb-3 text-sm font-black uppercase tracking-[.2em] ${team === 'radiant' ? 'text-emerald-300' : 'text-rose-300'}`}>{team}</p>
@@ -513,6 +596,34 @@ function readEvents(payload: unknown): GameSessionEvent[] {
 
 function matchPriority(status?: string) {
   return ({ in_progress: 0, connecting: 1, ready: 2, accepting: 3, completed: 4, cancelled: 5 } as Record<string, number>)[status ?? ''] ?? 9;
+}
+
+function parseStagingRoster(value: string) {
+  const lines = value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  if (lines.length < 1 || lines.length > 10) throw new Error('Enter between 1 and 10 staging players.');
+  const seen = new Set<string>();
+  return lines.map((line, index) => {
+    const [steamId64 = '', personaName = '', rawTeam = '', role = ''] = line.split('|').map(part => part.trim());
+    if (!/^7656119\d{10}$/.test(steamId64)) throw new Error(`Line ${index + 1}: enter a valid 17-digit Steam ID64.`);
+    if (seen.has(steamId64)) throw new Error(`Line ${index + 1}: duplicate Steam ID64.`);
+    seen.add(steamId64);
+    const normalizedTeam = rawTeam.toLowerCase();
+    if (normalizedTeam && !['radiant', 'dire'].includes(normalizedTeam)) {
+      throw new Error(`Line ${index + 1}: team must be radiant or dire.`);
+    }
+    return {
+      steamId64,
+      personaName: personaName || `Staging player ${index + 1}`,
+      ...(normalizedTeam ? { team: normalizedTeam } : {}),
+      role: role || 'Any',
+    };
+  });
+}
+
+function sessionMode(session: GameSession) {
+  if (session.verificationMode === 'development_diagnostic') return 'diagnostic';
+  if (session.verificationMode === 'development_staging') return 'staging';
+  return 'rated';
 }
 
 function shortId(value?: string) {
